@@ -50,6 +50,7 @@ const SQUARE_WAIT_POS = { x: 72.5, y: 8, z: 27.5 };
 const BANK_SIGN_POS = { x: 86.5, y: 8, z: 27.6 };
 const BANK_SIGN_STAND = { x: 85.8, y: 8, z: 28.5 };
 const BANK_CHEST_FLOOR = { x: 84.6, y: 8, z: 30.5 };
+const KAI_FAINT_POS = { x: 83.6, y: 8, z: 30.5 };
 const BANK_KEYPAD_ORIGIN = { x: 85.45, y: 9.05, z: 30.5 };
 const VAULT_EMERALD_COORDS = [
   [86, 8, 32], [87, 8, 32], [86, 8, 33], [87, 8, 33],
@@ -249,8 +250,8 @@ function triggerRichFinale(ctx) {
   ctx?.fx?.hearts?.({ x: cuicuiPos.x, y: 9.8, z: cuicuiPos.z }, 14);
   emitGag(ctx, 'villager', 'emerald_eyes', cuicuiPos);
 
-  ctx?.rival?.faint?.(BANK_CHEST_FLOOR, 'villager');
-  emitGag(ctx, 'villager', 'kai_faint', BANK_CHEST_FLOOR);
+  ctx?.rival?.faint?.(KAI_FAINT_POS, 'villager');
+  emitGag(ctx, 'villager', 'kai_faint', KAI_FAINT_POS);
 
   timers.after(1.45, () => {
     if (active) ctx?.quests?.complete?.('villager');

@@ -21,6 +21,322 @@ const REACTION_TEXT = Object.freeze({
   tryhard: '💪 再努力！加油！',
 });
 
+const HIDDEN_IDS = Object.freeze(['dragon', 'pinksheep']);
+
+function drawPixelQuestionMark(g, ox, oy, scale, color = '#ffe64d', shadow = '#1b1c24') {
+  const pts = [
+    [1, 0, 4, 1],
+    [0, 1, 2, 1],
+    [4, 1, 2, 2],
+    [2, 3, 3, 1],
+    [2, 4, 2, 1],
+    [2, 6, 2, 2],
+  ];
+  g.fillStyle = shadow;
+  for (const [x, y, w, h] of pts) {
+    g.fillRect(ox + x * scale + scale, oy + y * scale + scale, w * scale, h * scale);
+  }
+  g.fillStyle = color;
+  for (const [x, y, w, h] of pts) {
+    g.fillRect(ox + x * scale, oy + y * scale, w * scale, h * scale);
+  }
+}
+
+function drawMysterySlotThumb(canvas, hiddenId) {
+  const g = canvas.getContext('2d');
+  if (!g) return;
+  const W = canvas.width;
+  const H = canvas.height;
+  g.imageSmoothingEnabled = false;
+
+  if (hiddenId === 'dragon') {
+    g.fillStyle = '#1d1233';
+    g.fillRect(0, 0, W, H);
+    // Starry End motes
+    g.fillStyle = '#a855f7';
+    g.fillRect(6, 7, 3, 3);
+    g.fillRect(46, 10, 3, 3);
+    g.fillRect(10, 36, 2, 2);
+    g.fillStyle = '#f0abfc';
+    g.fillRect(44, 34, 3, 3);
+    // Cute mystery dragon-horn silhouette
+    g.fillStyle = '#0d0818';
+    g.fillRect(16, 14, 24, 24);
+    g.fillRect(13, 8, 6, 8);
+    g.fillRect(37, 8, 6, 8);
+    g.fillRect(8, 22, 8, 10);
+    g.fillRect(40, 22, 8, 10);
+    g.fillRect(14, 38, 28, 10);
+    drawPixelQuestionMark(g, 20, 14, 3, '#ffe64d', '#581c87');
+  } else {
+    g.fillStyle = '#3b1d36';
+    g.fillRect(0, 0, W, H);
+    g.fillStyle = '#ff8fab';
+    g.fillRect(7, 8, 3, 3);
+    g.fillRect(45, 9, 3, 3);
+    g.fillRect(9, 35, 3, 3);
+    g.fillStyle = '#ffd6e0';
+    g.fillRect(43, 35, 3, 3);
+    // Cute mystery fluffy-sheep silhouette
+    g.fillStyle = '#1c0d1a';
+    g.fillRect(14, 11, 28, 26);
+    g.fillRect(10, 16, 6, 14);
+    g.fillRect(40, 16, 6, 14);
+    g.fillRect(13, 37, 30, 11);
+    drawPixelQuestionMark(g, 20, 14, 3, '#ffd6e0', '#800f2f');
+  }
+}
+
+function drawSparklePx(g, cx, cy, s = 2, col = '#ffe64d') {
+  g.fillStyle = col;
+  g.fillRect(cx - s * 2, cy, s * 5, s);
+  g.fillRect(cx, cy - s * 2, s, s * 5);
+  g.fillStyle = '#ffffff';
+  g.fillRect(cx, cy, s, s);
+}
+
+function drawRightArrowPx(g, x, y) {
+  g.fillStyle = '#1b1c24';
+  g.fillRect(x + 2, y + 10, 18, 10);
+  g.fillRect(x + 16, y + 2, 4, 26);
+  g.fillRect(x + 20, y + 6, 4, 18);
+  g.fillRect(x + 24, y + 10, 4, 10);
+  g.fillRect(x + 28, y + 13, 3, 4);
+
+  g.fillStyle = '#ffe64d';
+  g.fillRect(x, y + 8, 18, 10);
+  g.fillRect(x + 14, y + 2, 4, 22);
+  g.fillRect(x + 18, y + 6, 4, 14);
+  g.fillRect(x + 22, y + 9, 4, 8);
+  g.fillStyle = '#fff9bf';
+  g.fillRect(x + 2, y + 9, 14, 4);
+}
+
+function drawMysteryHintCanvas(canvas, hiddenId) {
+  const g = canvas.getContext('2d');
+  if (!g) return;
+  const W = canvas.width;
+  const H = canvas.height;
+  g.imageSmoothingEnabled = false;
+  g.clearRect(0, 0, W, H);
+
+  // Panel backgrounds (two 124x136 picture tiles + center arrow)
+  const drawPanelFrame = (px, py, pw, ph, bg) => {
+    g.fillStyle = '#1b1c24';
+    g.fillRect(px - 3, py - 3, pw + 6, ph + 6);
+    g.fillStyle = bg;
+    g.fillRect(px, py, pw, ph);
+  };
+
+  if (hiddenId === 'dragon') {
+    // LEFT PANEL: Minecraft End Portal (12 teal frame blocks + Eyes of Ender + starry void)
+    const lx = 12;
+    const ly = 12;
+    drawPanelFrame(lx, ly, 124, 136, '#23322f');
+    // Shrine stone-brick floor grid
+    g.fillStyle = '#495057';
+    g.fillRect(lx + 4, ly + 4, 116, 128);
+    g.fillStyle = '#343a40';
+    for (let gx = lx + 4; gx < lx + 120; gx += 20) g.fillRect(gx, ly + 4, 2, 128);
+    for (let gy = ly + 4; gy < ly + 132; gy += 20) g.fillRect(lx + 4, gy, 116, 2);
+
+    // Starry black-purple End portal void in center
+    const vx = lx + 30;
+    const vy = ly + 36;
+    g.fillStyle = '#0b0418';
+    g.fillRect(vx, vy, 64, 64);
+    const stars = [
+      [8, 10, '#e879f9'], [26, 18, '#ffffff'], [48, 12, '#c084fc'],
+      [14, 38, '#74c0fc'], [34, 32, '#f0abfc'], [52, 42, '#ffffff'],
+      [20, 52, '#e879f9'], [44, 54, '#a855f7'],
+    ];
+    for (const [sx, sy, col] of stars) {
+      g.fillStyle = col;
+      g.fillRect(vx + sx, vy + sy, 4, 4);
+    }
+
+    // 12 End Portal Frame blocks (3 per side) with Ender Eyes
+    const drawPortalBlock = (bx, by) => {
+      g.fillStyle = '#dedb9c';
+      g.fillRect(bx, by, 20, 20);
+      g.fillStyle = '#2b7a69';
+      g.fillRect(bx + 2, by + 2, 16, 16);
+      // Glowing Eye of Ender
+      g.fillStyle = '#1b4332';
+      g.fillRect(bx + 5, by + 5, 10, 10);
+      g.fillStyle = '#80ed99';
+      g.fillRect(bx + 6, by + 6, 8, 8);
+      g.fillStyle = '#d8f3dc';
+      g.fillRect(bx + 8, by + 7, 3, 5);
+    };
+    for (let i = 0; i < 3; i++) {
+      drawPortalBlock(vx + i * 22, vy - 20); // North
+      drawPortalBlock(vx + i * 22, vy + 64); // South
+      drawPortalBlock(vx - 20, vy + i * 22); // West
+      drawPortalBlock(vx + 64, vy + i * 22); // East
+    }
+
+    // CENTER ARROW
+    drawRightArrowPx(g, 146, 66);
+
+    // RIGHT PANEL: Dragon Egg atop Obsidian Pillar on pale-yellow End Stone (#dedb9c)
+    const rx = 184;
+    const ry = 12;
+    drawPanelFrame(rx, ry, 124, 136, '#120824');
+    // Starry End sky
+    g.fillStyle = '#c084fc';
+    g.fillRect(rx + 12, ry + 16, 3, 3);
+    g.fillRect(rx + 104, ry + 22, 3, 3);
+    g.fillStyle = '#ffffff';
+    g.fillRect(rx + 22, ry + 42, 2, 2);
+    g.fillRect(rx + 96, ry + 48, 3, 3);
+
+    // Pale-yellow End Stone island base
+    g.fillStyle = '#dedb9c';
+    g.fillRect(rx + 10, ry + 112, 104, 20);
+    g.fillStyle = '#c5c17d';
+    g.fillRect(rx + 18, ry + 118, 12, 6);
+    g.fillRect(rx + 56, ry + 120, 16, 6);
+    g.fillRect(rx + 88, ry + 116, 14, 6);
+
+    // Tall Obsidian Pillar
+    g.fillStyle = '#241838';
+    g.fillRect(rx + 40, ry + 66, 44, 48);
+    g.fillStyle = '#3b2764';
+    g.fillRect(rx + 44, ry + 70, 8, 40);
+    g.fillRect(rx + 64, ry + 76, 6, 34);
+    g.fillStyle = '#581c87';
+    g.fillRect(rx + 40, ry + 66, 44, 4);
+
+    // Tiered Voxel Dragon Egg + glowing violet aura rim + magenta spots
+    const ex = rx + 44;
+    const ey = ry + 22;
+    g.fillStyle = '#9333ea';
+    g.fillRect(ex + 10, ey - 2, 16, 6);
+    g.fillRect(ex + 4, ey + 4, 28, 12);
+    g.fillRect(ex, ey + 14, 36, 20);
+    g.fillRect(ex + 4, ey + 32, 28, 12);
+    g.fillStyle = '#0d0818';
+    g.fillRect(ex + 12, ey, 12, 6);
+    g.fillRect(ex + 6, ey + 6, 24, 10);
+    g.fillRect(ex + 2, ey + 16, 32, 16);
+    g.fillRect(ex + 6, ey + 32, 24, 10);
+    g.fillStyle = '#2e1a4a';
+    g.fillRect(ex + 8, ey + 8, 8, 22);
+    // Magenta Dragon Egg spots
+    g.fillStyle = '#e879f9';
+    g.fillRect(ex + 14, ey + 8, 6, 6);
+    g.fillRect(ex + 6, ey + 20, 6, 6);
+    g.fillRect(ex + 22, ey + 18, 6, 6);
+    g.fillRect(ex + 14, ey + 30, 6, 6);
+    g.fillStyle = '#fae8ff';
+    g.fillRect(ex + 16, ey + 10, 2, 2);
+
+    drawSparklePx(g, rx + 26, ry + 28, 2, '#ffe64d');
+    drawSparklePx(g, rx + 96, ry + 32, 2, '#f0abfc');
+    drawSparklePx(g, rx + 88, ry + 16, 2, '#ffe64d');
+  } else {
+    // LEFT PANEL: Sparkling Pink Tulip on Jungle-Edge Grass
+    const lx = 12;
+    const ly = 12;
+    drawPanelFrame(lx, ly, 124, 136, '#74c0fc');
+    // Jungle foliage backdrop silhouette on left edge
+    g.fillStyle = '#2b6e28';
+    g.fillRect(lx + 4, ly + 8, 28, 56);
+    g.fillRect(lx + 32, ly + 16, 14, 28);
+    g.fillStyle = '#40913b';
+    g.fillRect(lx + 8, ly + 14, 16, 22);
+
+    // Grass + dirt block base
+    g.fillStyle = '#58b83f';
+    g.fillRect(lx + 4, ly + 98, 116, 14);
+    g.fillStyle = '#7c5334';
+    g.fillRect(lx + 4, ly + 112, 116, 20);
+    g.fillStyle = '#5c3b23';
+    g.fillRect(lx + 18, ly + 118, 14, 8);
+    g.fillRect(lx + 78, ly + 120, 16, 8);
+
+    // Stem + leaves
+    g.fillStyle = '#2ea44f';
+    g.fillRect(lx + 60, ly + 64, 8, 36);
+    g.fillRect(lx + 46, ly + 78, 14, 8);
+    g.fillRect(lx + 68, ly + 72, 14, 8);
+
+    // Vivid 3-petal Pixel Pink Tulip
+    const tx = lx + 42;
+    const ty = ly + 26;
+    g.fillStyle = '#ff4d94';
+    g.fillRect(tx, ty + 6, 12, 28);
+    g.fillRect(tx + 16, ty, 12, 34);
+    g.fillRect(tx + 32, ty + 6, 12, 28);
+    g.fillRect(tx + 4, ty + 24, 36, 16);
+    g.fillStyle = '#ff8fab';
+    g.fillRect(tx + 4, ty + 10, 6, 20);
+    g.fillRect(tx + 18, ty + 4, 8, 24);
+    g.fillRect(tx + 34, ty + 10, 6, 20);
+    g.fillStyle = '#ffe5ec';
+    g.fillRect(tx + 20, ty + 6, 4, 10);
+
+    drawSparklePx(g, lx + 28, ly + 36, 2, '#ffe64d');
+    drawSparklePx(g, lx + 100, ly + 28, 2, '#ffe64d');
+    drawSparklePx(g, lx + 98, ly + 62, 2, '#ffffff');
+
+    // CENTER ARROW
+    drawRightArrowPx(g, 146, 66);
+
+    // RIGHT PANEL: White Sheep + Pink Puff -> Pink Sheep!
+    const rx = 184;
+    const ry = 12;
+    drawPanelFrame(rx, ry, 124, 136, '#8ce99a');
+    // Meadow sky + grass
+    g.fillStyle = '#a5d8ff';
+    g.fillRect(rx + 4, ry + 4, 116, 94);
+    g.fillStyle = '#58b83f';
+    g.fillRect(rx + 4, ry + 98, 116, 34);
+
+    // Cute White-to-Pink Sheep (left half creamy white wool, right half blushing pink wool + sparkles!)
+    const sx = rx + 26;
+    const sy = ry + 32;
+    // Legs
+    g.fillStyle = '#8d6e63';
+    g.fillRect(sx + 14, sy + 56, 10, 16);
+    g.fillRect(sx + 48, sy + 56, 10, 16);
+    // Fluffy wool body (half white #fff8eb, half pink #ff8fab showing dye transformation!)
+    g.fillStyle = '#1b1c24';
+    g.fillRect(sx + 4, sy + 6, 64, 52);
+    g.fillStyle = '#fff8eb';
+    g.fillRect(sx + 8, sy + 10, 28, 44);
+    g.fillStyle = '#ff8fab';
+    g.fillRect(sx + 36, sy + 10, 28, 44);
+    g.fillStyle = '#ffb3c6';
+    g.fillRect(sx + 42, sy + 14, 18, 12);
+
+    // Cute MC Sheep Face in center
+    g.fillStyle = '#ffe0c8';
+    g.fillRect(sx + 20, sy + 20, 32, 26);
+    // Eyes
+    g.fillStyle = '#2b2238';
+    g.fillRect(sx + 24, sy + 28, 6, 6);
+    g.fillRect(sx + 42, sy + 28, 6, 6);
+    g.fillStyle = '#ffffff';
+    g.fillRect(sx + 24, sy + 28, 2, 2);
+    g.fillRect(sx + 42, sy + 28, 2, 2);
+    // Pink nose/blush
+    g.fillStyle = '#ff4d94';
+    g.fillRect(sx + 33, sy + 36, 6, 5);
+
+    // Pink heart + sparkles above sheep
+    g.fillStyle = '#ff4d94';
+    g.fillRect(rx + 84, ry + 16, 6, 6);
+    g.fillRect(rx + 92, ry + 16, 6, 6);
+    g.fillRect(rx + 82, ry + 20, 18, 6);
+    g.fillRect(rx + 86, ry + 26, 10, 4);
+    g.fillRect(rx + 89, ry + 30, 4, 3);
+    drawSparklePx(g, rx + 22, ry + 22, 2, '#ffe64d');
+    drawSparklePx(g, rx + 102, ry + 48, 2, '#ff4d94');
+  }
+}
+
 export function createBoardUI(ctx = {}, hooks = {}) {
   const uiRoot = hooks.mountRoot || document.getElementById('ui') || document.body;
   const tex = getVoxelTextures();
@@ -94,7 +410,76 @@ export function createBoardUI(ctx = {}, hooks = {}) {
   trayHint.textContent = '👆 ➡️ 🏆';
 
   trayBox.append(traySlot, trayHint);
-  sidePanel.append(closeBtn, trayBox);
+
+  // 2b. Hidden-contestant "?" mystery slots (#172 Q3: appear after quest 5; tap -> picture hint)
+  const mysteryBox = document.createElement('div');
+  mysteryBox.id = 'board-mystery-box';
+  mysteryBox.className = 'board-mystery-box ui-hidden';
+  mysteryBox.hidden = true;
+
+  const mysteryButtons = new Map();
+  for (const hid of HIDDEN_IDS) {
+    const mBtn = document.createElement('button');
+    mBtn.type = 'button';
+    mBtn.id = `mystery-slot-${hid}`;
+    mBtn.className = 'mc-btn board-mystery-btn';
+    mBtn.dataset.mysteryId = hid;
+    mBtn.setAttribute('aria-label', '神秘选手提示');
+    mBtn.style.backgroundImage = tex.quartz;
+
+    const thumbCanvas = document.createElement('canvas');
+    thumbCanvas.width = 56;
+    thumbCanvas.height = 48;
+    thumbCanvas.className = 'board-mystery-thumb';
+    drawMysterySlotThumb(thumbCanvas, hid);
+
+    const qLabel = document.createElement('span');
+    qLabel.className = 'board-mystery-label';
+    qLabel.textContent = '✨ ?';
+
+    mBtn.append(thumbCanvas, qLabel);
+    mysteryBox.appendChild(mBtn);
+    mysteryButtons.set(hid, mBtn);
+  }
+
+  sidePanel.append(closeBtn, trayBox, mysteryBox);
+
+  // 2c. Picture-hint Item-Frame Modal when tapping a "?" mystery slot (#172 Q3)
+  const hintModal = document.createElement('div');
+  hintModal.id = 'board-hint-modal';
+  hintModal.className = 'board-hint-modal ui-hidden';
+  hintModal.hidden = true;
+
+  const hintBackdrop = document.createElement('div');
+  hintBackdrop.className = 'board-hint-backdrop';
+
+  const hintCard = document.createElement('div');
+  hintCard.className = 'board-hint-card';
+  hintCard.style.backgroundImage = tex.oakPlank;
+
+  const hintMatting = document.createElement('div');
+  hintMatting.className = 'board-hint-matting';
+  hintMatting.style.backgroundImage = tex.quartz;
+
+  const hintCanvas = document.createElement('canvas');
+  hintCanvas.id = 'board-hint-canvas';
+  hintCanvas.width = 320;
+  hintCanvas.height = 160;
+  hintCanvas.className = 'board-hint-canvas';
+
+  const hintCaption = document.createElement('div');
+  hintCaption.id = 'board-hint-caption';
+  hintCaption.className = 'board-hint-caption';
+
+  const hintCloseBtn = document.createElement('button');
+  hintCloseBtn.type = 'button';
+  hintCloseBtn.id = 'board-hint-close-btn';
+  hintCloseBtn.className = 'mc-btn mc-btn-green board-hint-close-btn';
+  hintCloseBtn.innerHTML = `<span class="btn-icon">✔</span><span>知道啦</span>`;
+
+  hintMatting.append(hintCanvas, hintCaption, hintCloseBtn);
+  hintCard.appendChild(hintMatting);
+  hintModal.append(hintBackdrop, hintCard);
 
   // 3. Reaction banner shown over the live 3D plaza during §8.3 2.5 s celebration
   const reactionBanner = document.createElement('div');
@@ -124,11 +509,54 @@ export function createBoardUI(ctx = {}, hooks = {}) {
   dragProxy.append(dragProxyImg, dragProxyName);
 
   shell.append(wallFrame, sidePanel);
-  overlay.append(backdrop, shell, reactionBanner, ghostHand, dragProxy);
+  overlay.append(backdrop, shell, hintModal, reactionBanner, ghostHand, dragProxy);
   uiRoot.appendChild(overlay);
 
   let session = null;
   let dragState = null;
+
+  function hideHintModal() {
+    if (!hintModal.hidden) {
+      hintModal.hidden = true;
+      hintModal.classList.add('ui-hidden');
+    }
+    delete hintModal.dataset.mysteryId;
+    if (session && session.phase !== 'reaction') {
+      shell.classList.remove('ui-hidden');
+    }
+  }
+
+  function openHintModal(hiddenId) {
+    drawMysteryHintCanvas(hintCanvas, hiddenId);
+    hintModal.dataset.mysteryId = hiddenId;
+    hintCaption.textContent =
+      hiddenId === 'dragon' ? '🌀 末地门 ➡️ 🥚 龙蛋' : '🌷 郁金香 ➡️ 🐑 小羊';
+    hintCloseBtn._resetTapDebounce?.();
+    hideGhostHand();
+    shell.classList.add('ui-hidden');
+    hintModal.hidden = false;
+    hintModal.classList.remove('ui-hidden');
+  }
+
+  for (const [hid, mBtn] of mysteryButtons.entries()) {
+    bindTap(mBtn, () => {
+      openHintModal(hid);
+    }, { ctx, sfx: 'pop' });
+  }
+  bindTap(hintCloseBtn, () => {
+    hideHintModal();
+  }, { ctx, sfx: 'tap' });
+  hintBackdrop.addEventListener('pointerup', (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    ctx.events?.emit?.('sfx', { name: 'tap' });
+    hideHintModal();
+  });
+  hintBackdrop.addEventListener('click', (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    hideHintModal();
+  });
 
   function ensurePortraitURL(contestantId) {
     let url =
@@ -436,6 +864,38 @@ export function createBoardUI(ctx = {}, hooks = {}) {
       closeBtn.hidden = session?.phase === 'reaction';
       closeBtn.style.display = session?.phase === 'reaction' ? 'none' : '';
     }
+
+    // #172 Q3: Show "?" mystery slots after quest 5 for any unranked hidden contestant
+    const saved = progress.load() || {};
+    let doneMainCount = 0;
+    for (const entry of ROSTER) {
+      if (entry.hidden) continue;
+      if (
+        ctx.state?.quests?.[entry.id]?.status === 'done' ||
+        Boolean(boardState[entry.id]) ||
+        Boolean(saved?.questsDone?.[entry.id]) ||
+        Boolean(saved?.board?.[entry.id]) ||
+        newId === entry.id
+      ) {
+        doneMainCount += 1;
+      }
+    }
+
+    let visibleMysteryCount = 0;
+    const allowMystery = doneMainCount >= 5 && session?.phase !== 'reaction';
+    for (const [hid, mBtn] of mysteryButtons.entries()) {
+      const alreadyKnown = Boolean(boardState[hid]) || newId === hid;
+      const showSlot = allowMystery && !alreadyKnown;
+      mBtn.hidden = !showSlot;
+      mBtn.style.display = showSlot ? '' : 'none';
+      if (showSlot) {
+        mBtn._resetTapDebounce?.();
+        visibleMysteryCount += 1;
+      }
+    }
+    mysteryBox.hidden = visibleMysteryCount === 0;
+    mysteryBox.classList.toggle('ui-hidden', visibleMysteryCount === 0);
+    mysteryBox.style.display = visibleMysteryCount > 0 ? '' : 'none';
   }
 
   function triggerRowReaction(contestantId, tierId) {
@@ -597,6 +1057,7 @@ export function createBoardUI(ctx = {}, hooks = {}) {
 
     clearRowHighlights();
     hideGhostHand();
+    hideHintModal();
     dragProxy.hidden = true;
     dragProxy.classList.add('ui-hidden');
     reactionBanner.hidden = true;
@@ -623,10 +1084,12 @@ export function createBoardUI(ctx = {}, hooks = {}) {
     const r1 = targetRow.getBoundingClientRect();
     if (r0.width < 10 || r1.width < 10) return;
 
-    const sx = Math.round(r0.left + r0.width * 0.5);
-    const sy = Math.round(r0.top + r0.height * 0.5);
-    const ex = Math.round(r1.left + Math.min(220, r1.width * 0.55));
-    const ey = Math.round(r1.top + r1.height * 0.5);
+    const vw = window.innerWidth || 1024;
+    const vh = window.innerHeight || 768;
+    const sx = Math.max(8, Math.min(vw - 56, Math.round(r0.left + r0.width * 0.5 - 24)));
+    const sy = Math.max(8, Math.min(vh - 52, Math.round(r0.top + r0.height * 0.5 - 16)));
+    const ex = Math.max(8, Math.min(vw - 56, Math.round(r1.left + Math.min(220, r1.width * 0.55))));
+    const ey = Math.max(8, Math.min(vh - 52, Math.round(r1.top + r1.height * 0.5 - 16)));
 
     ghostHand.style.setProperty('--gh-x0', `${sx}px`);
     ghostHand.style.setProperty('--gh-y0', `${sy}px`);
@@ -636,6 +1099,14 @@ export function createBoardUI(ctx = {}, hooks = {}) {
     ghostHand.classList.remove('ui-hidden');
   }
 
+  window.addEventListener('resize', () => {
+    if (!ghostHand.hidden) {
+      requestAnimationFrame(() => {
+        if (!ghostHand.hidden) positionGhostHand();
+      });
+    }
+  });
+
   function cancelSession() {
     const pendingResolve = session?.resolve;
     session = null;
@@ -643,6 +1114,7 @@ export function createBoardUI(ctx = {}, hooks = {}) {
 
     clearRowHighlights();
     hideGhostHand();
+    hideHintModal();
     dragProxy.hidden = true;
     dragProxy.classList.add('ui-hidden');
     reactionBanner.hidden = true;
@@ -745,7 +1217,12 @@ export function createBoardUI(ctx = {}, hooks = {}) {
   return {
     el: overlay,
     show,
-    drop: (contestantId, tier) => commitDrop(contestantId || session?.newId, tier),
+    drop: (contestantId, tier) => {
+      if (tier === undefined && TIERS_BY_ID[contestantId]) {
+        return commitDrop(session?.newId, contestantId);
+      }
+      return commitDrop(contestantId || session?.newId, tier);
+    },
     continue: () => finishSession(),
     hide: () => finishSession(),
     cancel: cancelSession,

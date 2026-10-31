@@ -1,7 +1,7 @@
 export const ANIMS = [
   'idle', 'walk', 'run', 'strut', 'wave', 'cheer', 'pose', 'shrug', 'flex', 'pushup',
   'sad', 'happy', 'sneak', 'throw', 'dig', 'hop', 'teleport', 'spawn',
-  'eat', 'sneeze', 'faint', 'stuck', 'cry', 'dance',
+  'eat', 'sneeze', 'faint', 'dizzy', 'stuck', 'cry', 'dance',
 ];
 
 const ALIAS = {
@@ -10,6 +10,7 @@ const ALIAS = {
   laugh: 'happy',
   clap: 'cheer',
   crouch: 'sneak',
+  dizzyWalk: 'dizzy',
 };
 
 export function normalizeAnimName(name) {
@@ -355,34 +356,100 @@ export function applyActorAnim(actor, dt) {
     }
 
     case 'sneeze': {
-      const p = Math.min(1, t / 0.75);
-      if (p < 0.55) {
-        const u = p / 0.55;
-        if (head) head.rotation.x = -0.55 * u;
-        rig.scale.set(1 - u * 0.08, 1 + u * 0.12, 1 - u * 0.08);
+      if (t < 0.32) {
+        const u = t / 0.32;
+        if (head) head.rotation.x = -0.42 * u;
+        if (armL) armL.rotation.z = 0.45 * u;
+        if (armR) armR.rotation.z = -0.45 * u;
+        rig.scale.set(1 - u * 0.06, 1 + u * 0.11, 1 - u * 0.06);
+      } else if (t < 0.56) {
+        const u = (t - 0.32) / 0.24;
+        const burst = Math.sin(u * Math.PI);
+        if (head) head.rotation.x = 0.44 * burst - 0.08 * u;
+        if (armL) { armL.rotation.z = 0.72 * burst + 0.35 * u; armL.rotation.x = -0.50 * burst; }
+        if (armR) { armR.rotation.z = -0.72 * burst - 0.35 * u; armR.rotation.x = -0.50 * burst; }
+        rig.scale.set(1 + burst * 0.10, 1 - burst * 0.08, 1 + burst * 0.10);
       } else {
-        const u = 1 - (p - 0.55) / 0.45;
-        if (head) head.rotation.x = 0.65 * u;
-        if (armL) armL.rotation.z = 0.6 * u;
-        if (armR) armR.rotation.z = -0.6 * u;
-        rig.scale.set(1 + u * 0.12, 1 - u * 0.10, 1 + u * 0.12);
+        // Chin-up, open-faced joyful look so 三三's face & 3 heads read clearly on Gag-Cam (#183 R2)
+        const bob = Math.abs(Math.sin((t - 0.56) * 6.5));
+        rig.position.y = (actor.baseLift || 0) + bob * 0.09;
+        if (head) {
+          head.rotation.x = -0.10;
+          head.rotation.z = Math.sin(t * 5.0) * 0.06;
+        }
+        if (armL) { armL.rotation.z = 0.52; armL.rotation.x = -0.52; }
+        if (armR) { armR.rotation.z = -0.52; armR.rotation.x = -0.52; }
       }
       break;
     }
 
     case 'faint': {
-      const p = Math.min(1, t / (isKai ? 0.38 : 0.48));
-      const bounce = p >= 1 ? Math.exp(-(t - 0.4) * 6) * Math.abs(Math.sin(t * 18)) * 0.18 : 0;
-      // Kai dramatically face-plants flat with legs kicking up once!
-      rig.rotation.x = isKai ? (p * Math.PI * 0.49 - bounce) : (-p * Math.PI * 0.48 + bounce);
-      rig.position.y = p * 0.24 + bounce * 0.4;
-      if (armL) armL.rotation.z = 1.25 * p;
-      if (armR) armR.rotation.z = -1.25 * p;
-      if (isKai && t < 1.1) {
-        const twitch = Math.sin(t * 22) * (1.1 - t) * 0.45;
-        if (legL) legL.rotation.x = twitch;
-        if (legR) legR.rotation.x = -twitch;
+      if (!isKai) {
+        const p = Math.min(1, t / 0.45);
+        const bt = Math.max(0, t - 0.45);
+        const bounce = p >= 1 ? Math.exp(-bt * 6) * Math.abs(Math.sin(bt * 18)) * 0.16 : 0;
+        rig.rotation.x = -p * Math.PI * 0.48 + bounce;
+        rig.position.y = p * 0.24 + bounce * 0.35;
+        if (armL) armL.rotation.z = 1.20 * p;
+        if (armR) armR.rotation.z = -1.20 * p;
+        break;
       }
+      // #183 R1: 小凯 tips over backwards flat (0.35 s), legs twitch for whole gag cam, then springs up dizzy-walking!
+      const gx = actor.group?.position?.x ?? 0;
+      const forwardSlide = gx > 84.1 ? 1.55 : 0.72;
+      const springAt = actor._faintSpringAt ?? 0.96;
+      if (t < springAt) {
+        const p = Math.min(1, t / 0.35);
+        const ease = p * p * (2.2 - 1.2 * p);
+        const bt = Math.max(0, t - 0.35);
+        const bounce = p >= 1 ? Math.exp(-bt * 9.0) * Math.abs(Math.sin(bt * 24.0)) * 0.14 : 0;
+        rig.rotation.x = -ease * (Math.PI * 0.485) + bounce;
+        rig.rotation.y = ease * 0.54;
+        rig.position.y = ease * 0.25 + bounce * 0.35;
+        rig.position.z = ease * forwardSlide;
+        const armTw = p >= 1 ? Math.sin(t * 27.0) * 0.16 : 0;
+        if (armL) { armL.rotation.z = 1.16 * ease + armTw; armL.rotation.x = -0.45 * ease - armTw * 0.8; }
+        if (armR) { armR.rotation.z = -1.16 * ease + armTw; armR.rotation.x = -0.45 * ease + armTw * 0.8; }
+        if (p < 1) {
+          const kick = Math.sin(p * Math.PI) * 0.72;
+          if (legL) legL.rotation.x = -kick;
+          if (legR) legR.rotation.x = -kick * 0.65;
+        } else {
+          // Rapid alternating leg twitches UP into the air (-X lifts feet above floor when rig.rotation.x ≈ -π/2)
+          const tw = Math.sin((t - 0.35) * 32.0 + 0.75);
+          if (legL) {
+            legL.rotation.x = -0.48 - tw * 0.44;
+            legL.rotation.z = 0.11;
+          }
+          if (legR) {
+            legR.rotation.x = -0.48 + tw * 0.44;
+            legR.rotation.z = -0.11;
+          }
+          if (head) head.rotation.z = Math.sin(t * 23.0) * 0.09;
+        }
+      } else if (t < springAt + 0.25) {
+        // Elastic cartoon boing spring-up!
+        const u = (t - springAt) / 0.25;
+        const popEase = 1 - (1 - u) * (1 - u);
+        const arc = Math.sin(u * Math.PI);
+        rig.rotation.x = -(1 - popEase) * (Math.PI * 0.485);
+        rig.rotation.y = (1 - popEase) * 0.54;
+        rig.position.y = (1 - u) * 0.25 + arc * 0.52;
+        rig.position.z = forwardSlide * (1 - popEase * 0.55);
+        const sy = 1 + arc * 0.20;
+        rig.scale.set(1 / Math.sqrt(sy), sy, 1 / Math.sqrt(sy));
+        if (armL) { armL.rotation.z = 1.16 - u * 0.24; armL.rotation.x = -0.95 * arc; }
+        if (armR) { armR.rotation.z = -1.16 + u * 0.24; armR.rotation.x = -0.95 * arc; }
+        if (legL) legL.rotation.x = -0.36 * arc;
+        if (legR) legR.rotation.x = 0.28 * arc;
+      } else {
+        applyDizzyWalkPose(actor, t - springAt - 0.25, forwardSlide * 0.45);
+      }
+      break;
+    }
+
+    case 'dizzy': {
+      applyDizzyWalkPose(actor, t, 0);
       break;
     }
 
@@ -458,5 +525,38 @@ function applySpecialTransition(actor, name, t) {
     rig.rotation.y = (1 - ease) * Math.PI * 1.5;
     if (parts.armL) parts.armL.rotation.z = 0.8 * (1 - ease) + 0.1;
     if (parts.armR) parts.armR.rotation.z = -0.8 * (1 - ease) - 0.1;
+  }
+}
+
+function applyDizzyWalkPose(actor, dtTime, baseZ = 0) {
+  const { rig, parts } = actor;
+  const { head, armL, armR, legL, legR } = parts;
+  const sw = dtTime * 6.4;
+  rig.position.x = Math.sin(sw) * 0.34;
+  rig.position.z = baseZ + Math.sin(sw * 0.5) * 0.18;
+  rig.position.y = (actor.baseLift || 0) + Math.abs(Math.sin(sw * 2.0)) * 0.11;
+  rig.rotation.z = Math.sin(sw) * 0.26;
+  rig.rotation.x = Math.cos(sw * 1.3) * 0.12;
+  rig.rotation.y = Math.sin(sw * 0.7) * 0.32;
+  if (head) {
+    head.rotation.z = Math.cos(sw * 1.4) * 0.28;
+    head.rotation.x = Math.sin(sw * 1.4) * 0.22;
+    head.rotation.y = Math.sin(sw) * 0.24;
+  }
+  if (armL) {
+    armL.rotation.z = 0.92 + Math.sin(sw * 2.1) * 0.42;
+    armL.rotation.x = -0.55 + Math.cos(sw * 2.1) * 0.55;
+  }
+  if (armR) {
+    armR.rotation.z = -0.92 + Math.cos(sw * 2.1) * 0.42;
+    armR.rotation.x = -0.55 - Math.sin(sw * 2.1) * 0.55;
+  }
+  if (legL) {
+    legL.rotation.x = Math.sin(sw * 2.0) * 0.68;
+    legL.rotation.z = 0.08 + Math.max(0, Math.sin(sw)) * 0.16;
+  }
+  if (legR) {
+    legR.rotation.x = -Math.sin(sw * 2.0) * 0.68;
+    legR.rotation.z = -0.08 + Math.min(0, Math.sin(sw)) * 0.16;
   }
 }

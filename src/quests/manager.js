@@ -113,9 +113,9 @@ export function buildQuestManager(ctx, mainQuests = [], hiddenQuests = [], creat
       const y = surfaceY(ctx, 48, 72, 8);
       return { x: 48, y, z: 72 };
     }
-    // Jungle trailhead >= 12b from 喵喵's first log perch (#143)
+    // SW Jungle trailhead >= 12b from 喵喵's first jungle log perch (#143, #172 Q1)
     if (q.id === 'cat') {
-      return { x: 36.5, y: 8, z: 67.5 };
+      return { x: 28.5, y: surfaceY(ctx, 28, 66, 8), z: 66.5 };
     }
     // East cobblestone approach road leading to the cave hill
     if (q.id === 'golem') {
@@ -583,7 +583,7 @@ export function buildQuestManager(ctx, mainQuests = [], hiddenQuests = [], creat
     } else if (questId === 'golem') {
       spawnPos = { x: 56.5, y: 8, z: 48.5 };
     } else if (questId === 'cat') {
-      spawnPos = { x: 36.5, y: 8, z: 67.5 };
+      spawnPos = { x: 28.5, y: surfaceY(ctx, 28, 66, 8), z: 66.5 };
     } else if (questId === 'creeper') {
       spawnPos = { x: 35.5, y: 8, z: 52.5 };
     } else {

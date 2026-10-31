@@ -30,6 +30,8 @@ import {
 
 let dragonTimers = null;
 let eggGroup = null;
+let hopFxGroup = null;
+let hopAnimState = null;
 let eggUnpick = null;
 let dragonActor = null;
 let eggTapCount = 0;
@@ -44,20 +46,247 @@ const EGG_HOP_SPOTS = [
 ];
 let currentEggPos = { ...EGG_HOP_SPOTS[0] };
 
-function buildDragonEggMesh() {
+// #183 R3: Full 1-block Minecraft Dragon Egg (~1.04 x 1.20 x 1.04) with crisp silhouette & glowing Ender spots
+function buildDragonEggMesh({ ghost = false } = {}) {
   const g = new THREE.Group();
-  const base = new THREE.Mesh(sharedBoxGeo(0.76, 0.42, 0.76), sharedLambertMat(0x1f102e));
-  base.position.y = 0.21;
-  const mid = new THREE.Mesh(sharedBoxGeo(0.62, 0.36, 0.62), sharedLambertMat(0x2b1540));
-  mid.position.y = 0.56;
-  const tip = new THREE.Mesh(sharedBoxGeo(0.4, 0.24, 0.4), sharedLambertMat(0x3a1c54));
-  tip.position.y = 0.84;
-  const rune1 = new THREE.Mesh(sharedBoxGeo(0.66, 0.1, 0.18), sharedBasicMat(0xd946ef));
-  rune1.position.y = 0.52;
-  const rune2 = new THREE.Mesh(sharedBoxGeo(0.18, 0.1, 0.66), sharedBasicMat(0xa855f7));
-  rune2.position.y = 0.36;
-  g.add(base, mid, tip, rune1, rune2);
+  const matShellA = ghost
+    ? sharedBasicMat(0x9333ea, { transparent: true, opacity: 0.48 })
+    : sharedBasicMat(0x240d3d);
+  const matShellB = ghost
+    ? sharedBasicMat(0xc084fc, { transparent: true, opacity: 0.55 })
+    : sharedBasicMat(0x3f1868);
+  const matTrim = ghost
+    ? sharedBasicMat(0xd8b4fe, { transparent: true, opacity: 0.62 })
+    : sharedBasicMat(0x6b21a8);
+  const matRuneA = ghost
+    ? sharedBasicMat(0xfdf4ff, { transparent: true, opacity: 0.82 })
+    : sharedBasicMat(0xf0abfc);
+  const matRuneB = ghost
+    ? sharedBasicMat(0xe879f9, { transparent: true, opacity: 0.76 })
+    : sharedBasicMat(0xd946ef);
+  const matGlowRim = sharedBasicMat(0xc084fc, { transparent: true, opacity: ghost ? 0.34 : 0.62 });
+
+  const halo = new THREE.Mesh(sharedBoxGeo(1.18, 0.06, 1.18), matGlowRim);
+  halo.position.y = 0.03;
+
+  // Stepped 1-block voxel Dragon Egg silhouette with subtle violet edge trim so every tier pops against dark End sky
+  const baseTrim = new THREE.Mesh(sharedBoxGeo(0.9, 0.2, 0.9), matTrim);
+  baseTrim.position.y = 0.1;
+  const base = new THREE.Mesh(sharedBoxGeo(0.86, 0.21, 0.86), matShellA);
+  base.position.y = 0.1;
+
+  const bellyTrim = new THREE.Mesh(sharedBoxGeo(1.06, 0.34, 1.06), matTrim);
+  bellyTrim.position.y = 0.36;
+  const belly = new THREE.Mesh(sharedBoxGeo(1.02, 0.35, 1.02), matShellB);
+  belly.position.y = 0.36;
+
+  const midTrim = new THREE.Mesh(sharedBoxGeo(0.94, 0.26, 0.94), matTrim);
+  midTrim.position.y = 0.66;
+  const mid = new THREE.Mesh(sharedBoxGeo(0.9, 0.27, 0.9), matShellA);
+  mid.position.y = 0.66;
+
+  const shoulder = new THREE.Mesh(sharedBoxGeo(0.72, 0.2, 0.72), matShellB);
+  shoulder.position.y = 0.89;
+  const crown = new THREE.Mesh(sharedBoxGeo(0.48, 0.15, 0.48), matShellA);
+  crown.position.y = 1.06;
+  const tip = new THREE.Mesh(sharedBoxGeo(0.28, 0.11, 0.28), matRuneA);
+  tip.position.y = 1.19;
+
+  // Signature Minecraft Dragon Egg magenta/violet pixel spots on all 4 faces
+  const bandBellyX = new THREE.Mesh(sharedBoxGeo(1.08, 0.13, 0.24), matRuneA);
+  bandBellyX.position.set(0, 0.4, 0.14);
+  const bandBellyZ = new THREE.Mesh(sharedBoxGeo(0.24, 0.13, 1.08), matRuneB);
+  bandBellyZ.position.set(-0.15, 0.3, 0);
+  const bandMidX = new THREE.Mesh(sharedBoxGeo(0.96, 0.12, 0.22), matRuneB);
+  bandMidX.position.set(0, 0.67, -0.12);
+  const bandMidZ = new THREE.Mesh(sharedBoxGeo(0.22, 0.12, 0.96), matRuneA);
+  bandMidZ.position.set(0.14, 0.64, 0);
+  const bandTopX = new THREE.Mesh(sharedBoxGeo(0.76, 0.1, 0.2), matRuneA);
+  bandTopX.position.set(0, 0.9, 0);
+  const bandTopZ = new THREE.Mesh(sharedBoxGeo(0.2, 0.1, 0.76), matRuneB);
+  bandTopZ.position.set(0, 0.88, 0);
+
+  g.add(
+    halo,
+    baseTrim,
+    base,
+    bellyTrim,
+    belly,
+    midTrim,
+    mid,
+    shoulder,
+    crown,
+    tip,
+    bandBellyX,
+    bandBellyZ,
+    bandMidX,
+    bandMidZ,
+    bandTopX,
+    bandTopZ
+  );
+  g.traverse((n) => {
+    if (n.isMesh) n.frustumCulled = false;
+  });
   return g;
+}
+
+function buildHopFxGroup(ctx) {
+  const root = new THREE.Group();
+  root.visible = false;
+
+  const poofPuffs = [];
+  const poofColors = [0xffffff, 0xfaf5ff, 0xf3e8ff, 0xe9d5ff];
+  for (let i = 0; i < 12; i++) {
+    const sz = 0.24 + (i % 3) * 0.06;
+    const m = new THREE.Mesh(
+      sharedBoxGeo(sz, sz * 0.82, sz),
+      sharedBasicMat(poofColors[i % poofColors.length], { transparent: true, opacity: 0.9 })
+    );
+    m.frustumCulled = false;
+    root.add(m);
+    poofPuffs.push(m);
+  }
+
+  const vortexSparks = [];
+  const portalColors = [0xd946ef, 0xa855f7, 0xc084fc, 0xf0abfc];
+  for (let i = 0; i < 18; i++) {
+    const sz = 0.14 + (i % 3) * 0.04;
+    const m = new THREE.Mesh(
+      sharedBoxGeo(sz, sz, sz),
+      sharedBasicMat(portalColors[i % portalColors.length])
+    );
+    m.frustumCulled = false;
+    root.add(m);
+    vortexSparks.push(m);
+  }
+
+  const trailNodes = [];
+  for (let i = 0; i < 20; i++) {
+    const isPoof = i % 2 === 0;
+    const sz = isPoof ? 0.32 - i * 0.006 : 0.22 - i * 0.004;
+    const m = new THREE.Mesh(
+      sharedBoxGeo(sz, sz, sz),
+      isPoof
+        ? sharedBasicMat(i % 4 === 0 ? 0xffffff : 0xf5d0fe, { transparent: true, opacity: 0.9 })
+        : sharedBasicMat(i % 4 === 1 ? 0xd946ef : 0xa855f7)
+    );
+    m.frustumCulled = false;
+    root.add(m);
+    trailNodes.push(m);
+  }
+
+  const ghostEgg = buildDragonEggMesh({ ghost: true });
+  root.add(ghostEgg);
+
+  root.userData._parts = { poofPuffs, vortexSparks, trailNodes, ghostEgg };
+
+  // Driver hook so portal vortex, poof cloud, trail, and 1-block egg wobble animate cleanly even while Gag-Cam pauses quest.update!
+  const driver = poofPuffs[0];
+  driver.renderOrder = -40;
+  driver.onBeforeRender = () => {
+    syncHopVisualAtTime(ctx);
+  };
+
+  return root;
+}
+
+function hopArcPoint(from, to, u) {
+  const dx = to.x - from.x;
+  const dz = to.z - from.z;
+  const horizLen = Math.hypot(dx, dz) || 1;
+  // Normal in XZ sweeping outward into open sky so the poof trail never hides behind the obsidian pillar
+  const nx = -dz / horizLen;
+  const nz = dx / horizLen;
+  const sideBow = Math.sin(u * Math.PI) * 1.45;
+  const arcLift = Math.sin(u * Math.PI) * 3.1 + (1 - u) * 0.45;
+  return {
+    x: from.x + dx * u + nx * sideBow,
+    y: from.y + (to.y - from.y) * u + arcLift,
+    z: from.z + dz * u + nz * sideBow,
+  };
+}
+
+function syncHopVisualAtTime(ctx) {
+  if (!hopAnimState || !hopFxGroup || !eggGroup || dragonFinishing) return;
+  const now = ctx?.time ?? 0;
+  const elapsed = Math.max(0, now - hopAnimState.startTime);
+  const { from, to } = hopAnimState;
+  const parts = hopFxGroup.userData._parts;
+  if (!parts) return;
+
+  if (elapsed >= 1.42) {
+    hopFxGroup.visible = false;
+    eggGroup.position.set(currentEggPos.x, currentEggPos.y, currentEggPos.z);
+    eggGroup.rotation.set(0, now * 1.4, 0);
+    eggGroup.scale.set(1, 1, 1);
+    eggGroup.updateMatrixWorld(true);
+    hopAnimState = null;
+    return;
+  }
+
+  hopFxGroup.visible = (ctx?.state?.area || 'hub') === 'end';
+
+  // Phase A (0 .. 0.88s, covers Gag-Cam mid-point 0.67s!):
+  // Keep the full 1-block Dragon Egg floating cleanly above its launch poof cushion so its front face is 100% clear!
+  if (elapsed < 0.88) {
+    const wob = Math.sin(elapsed * 20.0);
+    const lift = 0.36 + Math.sin(Math.min(1, elapsed / 0.88) * Math.PI) * 0.24;
+    eggGroup.position.set(from.x, from.y + lift, from.z);
+    eggGroup.rotation.set(wob * 0.12, 0.55 + elapsed * 2.2, Math.cos(elapsed * 16.0) * 0.14);
+    const sq = 1.0 + Math.sin(elapsed * 15.0) * 0.06;
+    eggGroup.scale.set(1.06 / Math.sqrt(sq), sq * 1.06, 1.06 / Math.sqrt(sq));
+  } else {
+    // Phase B (0.88 .. 1.42s): zip along the same parabolic hop arc into `to` (`currentEggPos`)!
+    const zt = Math.min(1, (elapsed - 0.88) / 0.28);
+    const pt = hopArcPoint(from, to, zt);
+    eggGroup.position.set(pt.x, zt >= 0.99 ? to.y : pt.y, pt.z);
+    eggGroup.rotation.set(0, now * 3.0, 0);
+    const pop = zt < 0.5 ? 0.62 + zt * 0.76 : 1.0 + Math.sin((zt - 0.5) * Math.PI * 2) * 0.12;
+    eggGroup.scale.setScalar(pop);
+  }
+  eggGroup.updateMatrixWorld(true);
+
+  // 1. Fluffy white-lilac "POOF" launch cushion ringing the obsidian base UNDER the 1-block egg (never blocking its face!)
+  const poofExpand = Math.min(1.18, 0.38 + elapsed * 1.05);
+  parts.poofPuffs.forEach((m, i) => {
+    const ang = (i / parts.poofPuffs.length) * Math.PI * 2 + elapsed * 1.2;
+    const rad = (0.56 + (i % 3) * 0.18) * poofExpand;
+    const py = 0.08 + (i % 3) * 0.09;
+    m.position.set(from.x + Math.cos(ang) * rad, from.y + py, from.z + Math.sin(ang) * rad);
+    m.rotation.set(0, ang, 0);
+    const s = Math.max(0.2, 1.15 - elapsed * 0.45);
+    m.scale.setScalar(s);
+  });
+
+  // 2. Swirling purple End-portal particles orbiting cleanly outside the 1-block egg silhouette
+  parts.vortexSparks.forEach((m, i) => {
+    const ang = (i / parts.vortexSparks.length) * Math.PI * 2 + elapsed * 4.8;
+    const rad = 0.84 + (i % 3) * 0.18;
+    const sy = 0.28 + ((i * 0.11 + elapsed * 1.15) % 1.35);
+    m.position.set(from.x + Math.cos(ang) * rad, from.y + sy, from.z + Math.sin(ang) * rad);
+    m.rotation.set(elapsed * 5 + i, elapsed * 4, 0);
+  });
+
+  // 3. High curved purple-portal + white-poof trail sweeping visibly toward `to` (`nextSpot`)!
+  const reach = Math.min(1.0, elapsed / 0.48);
+  parts.trailNodes.forEach((m, i) => {
+    const u = ((i + 1) / (parts.trailNodes.length + 1)) * reach;
+    const pt = hopArcPoint(from, to, u);
+    const wobble = Math.sin(u * 12.0 - elapsed * 8.0) * 0.08;
+    m.position.set(pt.x + wobble, pt.y, pt.z);
+    m.rotation.set(elapsed * 3 + i, elapsed * 4 + i, 0);
+    m.scale.setScalar(Math.max(0.32, 1.22 - u * 0.35));
+  });
+
+  // 4. Shimmering translucent ghost egg mid-hop along the poof trail pointing to `nextSpot`!
+  const gu = Math.min(0.62, Math.max(0.24, elapsed * 0.56));
+  const gpt = hopArcPoint(from, to, gu);
+  parts.ghostEgg.visible = elapsed < 1.05;
+  parts.ghostEgg.position.set(gpt.x, gpt.y, gpt.z);
+  parts.ghostEgg.rotation.set(0.22, 0.55 + elapsed * 4.2, -0.24);
+  parts.ghostEgg.scale.setScalar(0.76);
+
+  hopFxGroup.updateMatrixWorld(true);
 }
 
 export const dragonQuest = {
@@ -76,11 +305,15 @@ export const dragonQuest = {
 
     const p0 = poi(ctx, 'dragonEgg', EGG_HOP_SPOTS[0]);
     currentEggPos = { x: 152.5, y: p0.y ?? 17, z: 26.5 };
+    hopAnimState = null;
 
     eggGroup = buildDragonEggMesh();
     eggGroup.position.set(currentEggPos.x, currentEggPos.y, currentEggPos.z);
     eggGroup.visible = (ctx?.state?.area || 'hub') === 'end';
     attachToScene(ctx, eggGroup);
+
+    hopFxGroup = buildHopFxGroup(ctx);
+    attachToScene(ctx, hopFxGroup);
 
     eggUnpick = registerPick(ctx, eggGroup, {
       id: 'dragon_egg',
@@ -99,8 +332,17 @@ export const dragonQuest = {
     const inEnd = (ctx?.state?.area || 'hub') === 'end';
     if (eggGroup && !dragonFinishing) {
       eggGroup.visible = inEnd;
-      eggGroup.rotation.y += dt * 1.4;
-      eggGroup.position.y = currentEggPos.y + Math.sin((ctx?.time ?? 0) * 4.0) * 0.08;
+      if (hopAnimState) {
+        syncHopVisualAtTime(ctx);
+      } else {
+        eggGroup.rotation.set(0, (ctx?.time ?? 0) * 1.4, 0);
+        eggGroup.scale.set(1, 1, 1);
+        eggGroup.position.set(
+          currentEggPos.x,
+          currentEggPos.y + Math.sin((ctx?.time ?? 0) * 4.0) * 0.08,
+          currentEggPos.z
+        );
+      }
     }
     dragonActor?.update?.(dt);
   },
@@ -135,21 +377,31 @@ export const dragonQuest = {
       }
 
       if (eggTapCount < 4) {
-        // §6 H1: Egg teleports 3x!
-        playSfx(ctx, 'vwoop', { pos: oldPos, pitch: 0.95 + eggTapCount * 0.12 });
-        ctx?.fx?.burst?.({ x: oldPos.x, y: oldPos.y + 0.5, z: oldPos.z }, 0xa855f7, 16);
-        emitGag(ctx, 'dragon', 'egg_hop', oldPos);
-
+        // §6 H1 & #183 R3: 1-block egg teleports 3x with purple portal burst + "poof" trail to nextSpot!
         const nextSpot = EGG_HOP_SPOTS[Math.min(eggTapCount, EGG_HOP_SPOTS.length - 1)];
         const ny = surfaceY(ctx, nextSpot.x, nextSpot.z, nextSpot.y);
         currentEggPos = { x: nextSpot.x, y: ny, z: nextSpot.z };
-        if (eggGroup) eggGroup.position.set(currentEggPos.x, currentEggPos.y, currentEggPos.z);
-        ctx?.fx?.sparkles?.(currentEggPos, 10, { toPlayer: false });
+
+        hopAnimState = {
+          startTime: ctx?.time ?? 0,
+          from: { ...oldPos },
+          to: { ...currentEggPos },
+        };
+        syncHopVisualAtTime(ctx);
+
+        playSfx(ctx, 'vwoop', { pos: oldPos, pitch: 0.95 + eggTapCount * 0.12 });
+        playSfx(ctx, 'pop', { pos: oldPos, pitch: 1.15 });
+        ctx?.fx?.burst?.({ x: oldPos.x, y: oldPos.y + 0.6, z: oldPos.z }, 0xa855f7, 26);
+        ctx?.fx?.burst?.({ x: oldPos.x, y: oldPos.y + 0.4, z: oldPos.z }, 0xf5d0fe, 14);
+        ctx?.fx?.sparkles?.(currentEggPos, 14, { toPlayer: false });
+        emitGag(ctx, 'dragon', 'egg_hop', oldPos);
         return true;
       }
 
       // 4th tap: HATCH 龙宝宝!
       dragonFinishing = true;
+      hopAnimState = null;
+      if (hopFxGroup) hopFxGroup.visible = false;
       if (eggGroup) eggGroup.visible = false;
       eggUnpick?.();
 
@@ -158,8 +410,6 @@ export const dragonQuest = {
       ctx?.fx?.confetti?.(oldPos, 50);
       ctx?.fx?.sparkles?.(oldPos, 18, { toPlayer: true });
       ctx?.events?.emit?.('spawnBig', { pos: oldPos, kind: 'dragon' });
-      emitGag(ctx, 'dragon', 'egg_hop', oldPos);
-
       if (ctx?.chars?.create) {
         dragonActor = acquireActor(ctx, 'hidden:dragon', 'dragon', {
           id: 'dragon_contestant',
@@ -167,8 +417,9 @@ export const dragonQuest = {
           anim: 'spawn',
         });
         dragonActor?.setEmote?.('💜');
-        dragonActor?.lookAt?.(playerPos(ctx));
+        dragonActor?.lookAt?.({ x: oldPos.x + 1.2, y: oldPos.y, z: oldPos.z + 4.5 });
       }
+      emitGag(ctx, 'dragon', 'egg_hop', oldPos);
 
       dragonTimers.after(0.85, () => {
         ctx?.quests?.complete?.('dragon');
@@ -239,6 +490,9 @@ export const dragonQuest = {
     eggUnpick = null;
     if (eggGroup) detachFromScene(eggGroup);
     eggGroup = null;
+    if (hopFxGroup) detachFromScene(hopFxGroup);
+    hopFxGroup = null;
+    hopAnimState = null;
     if (dragonActor?.group) detachFromScene(dragonActor.group);
     dragonActor = null;
     if (eggRestoredVoxel && !ctx?.state?.contestants?.dragon?.found) {

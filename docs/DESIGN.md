@@ -1,7 +1,7 @@
 # 我的世界：生物选美大赛 · Mob Beauty Pageant — Binding Design (owner: opus-pageant-director)
 
-Reference: Bilibili BV1XynB6EEpk 《我的世界：生物美貌排行榜！在线选美大赛！》 (辰羊游戏, 11.7 min). Frames studied in
-`/tmp/bv1xyn/sheet_01..09.jpg`. Video beats we keep: the giant 5-row colored **tier wall standing in a grass field**
+Reference: Bilibili BV1XynB6EEpk 《我的世界：生物美貌排行榜！在线选美大赛！》 (辰羊游戏, 11.7 min). Frames studied from
+9 timestamped contact sheets. Video beats we keep: the giant 5-row colored **tier wall standing in a grass field**
 (0:20, 11:35), red-caped **"?" mystery cards** for unmet mobs (0:10), the **NEXT picture-frame reveal** (6:20, 8:30),
 sheep that grows flowers where she walks (0:05), slime girl summoning slimes in a swamp (0:30), iron golem from iron
 blocks + a carved pumpkin, with the **"fake iron" dirt swap on 贝拉's statue** (1:25–2:30) and **snow golems dropping
@@ -39,12 +39,8 @@ characters visible in any one HUD string, zero `speechSynthesis`.
   the same grid; only the current area's chunks are `visible`:
   - **hub** x∈[0,96) z∈[0,96) (island ≈ 80×80, sea level y=6, ground ≈ y=8; ocean outside = one water plane),
   - **end** x∈[128,176) z∈[16,64), **nether** x∈[192,240) z∈[16,64).
-- Ports for local serving (avoid collisions): director 8790, core 8791, voxel-world 8792, characters 8793,
-  quests-a 8794, quests-b 8795, pageant-ui 8796, fx-audio 8797, qa-sims 8798. Prefer `tests/cdp.py` (serves the
-  repo in-process, headless Chrome) for automated checks.
-- ALL scratch/screenshots/logs go under `/tmp/bv1xyn/` (shots: `/tmp/bv1xyn/shots/<module>/*.jpg`, **JPEG only**).
-  Root disk is at 99 %: never write junk in the repo, `~` or `/google/`. Builders never `git commit` (director owns
-  git). Never write real family names.
+- Testing: `tests/cdp.py` serves the repo in-process and drives headless Chrome over the DevTools protocol; all
+  test scratch output (screenshots as JPEG, JSON reports) goes to a temp directory, never into the repo.
 
 ## 2. File ownership (one owner per file; ask the owner on the board for changes)
 
@@ -57,7 +53,7 @@ characters visible in any one HUD string, zero `speechSynthesis`.
 | **quests-b** | `src/quests/{rival,finale}.js`, `src/quests/q_{snow,bee,ender,wither,villager}.js` |
 | **pageant-ui** | `styles/main.css`, `src/ui/{hud,title,booth,board,menus,progress,portrait,share,next}.js` |
 | **fx-audio** | `src/fx/{particles,shake,confetti,fireworks,popups,rings,audio,music,sfx}.js` |
-| **qa-sims** | `tests/*` (except `tests/cdp.py` = director, edits allowed for bug fixes), `/tmp/bv1xyn/qa/*` |
+| **qa-sims** | `tests/*` (`tests/cdp.py` = director, edits allowed for bug fixes) |
 | director | `docs/DESIGN.md`, `README.md`, `screenshot.jpg`, `.gitignore`, `.nojekyll`, git |
 
 Day-one rule: every owner creates its files with **working stubs that match §3 within the first 15 minutes**, so

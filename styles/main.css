@@ -944,6 +944,133 @@ body > canvas {
   pointer-events: none;
 }
 
+.board-mystery-box {
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.board-mystery-btn {
+  width: 84px;
+  height: 88px;
+  min-width: 72px;
+  min-height: 72px;
+  padding: 4px;
+  border: 3px solid #1b1c24;
+  background-color: #faf7f0;
+  background-size: 48px 48px;
+  color: #2b1d3d;
+  text-shadow: none;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.85),
+    0 5px 0 #14151c;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 3px;
+}
+
+.board-mystery-thumb {
+  width: 68px;
+  height: 52px;
+  display: block;
+  flex: 0 0 auto;
+  border: 2px solid #1b1c24;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
+.board-mystery-label {
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: 0;
+  color: #2b1d3d;
+  text-shadow: none;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.board-hint-modal {
+  position: fixed;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+.board-hint-backdrop {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  inset: 0;
+  background: rgba(12, 16, 28, 0.72);
+  pointer-events: auto;
+}
+
+.board-hint-card {
+  position: relative;
+  z-index: 2;
+  padding: 14px;
+  border: 6px solid #3c220d;
+  background-color: #7c4a21;
+  background-size: 48px 48px;
+  box-shadow:
+    inset 0 4px 0 #b06d35,
+    inset 0 -5px 0 #4d2c12,
+    0 12px 0 rgba(0, 0, 0, 0.55);
+  animation: cardSnapBounce 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.board-hint-matting {
+  padding: 12px 14px;
+  background-color: #faf7f0;
+  background-size: 48px 48px;
+  border: 4px solid #593518;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.board-hint-canvas {
+  width: 320px;
+  height: 160px;
+  display: block;
+  border: 3px solid #1b1c24;
+  image-rendering: pixelated;
+}
+
+.board-hint-caption {
+  padding: 5px 14px;
+  background: #261b3a;
+  border: 3px solid #1b1c24;
+  color: #ffe64d;
+  font-size: 20px;
+  font-weight: 900;
+  line-height: 1.15;
+  text-shadow: 0 2px 0 #000000;
+  white-space: nowrap;
+}
+
+.board-hint-close-btn {
+  min-width: 176px;
+  min-height: 74px;
+  font-size: 21px;
+}
+
 .board-reaction-banner {
   position: fixed;
   top: max(14px, var(--safe-t));
@@ -1507,24 +1634,82 @@ body > canvas {
     flex: 0 0 auto;
     flex-direction: row;
     justify-content: center;
+    gap: 8px;
+  }
+
+  .board-close-btn {
+    width: auto;
+    flex: 1 1 auto;
+    min-width: 112px;
   }
 
   .board-tray-box {
+    width: auto;
+    flex: 0 1 auto;
     flex-direction: row;
-    padding: 8px 14px;
-    gap: 14px;
+    padding: 6px 8px;
+    gap: 6px;
+  }
+
+  .board-tray-hint {
+    font-size: 15px;
   }
 
   .tray-card {
-    width: 104px;
-    height: 110px;
-    min-width: 98px;
-    min-height: 98px;
+    width: 98px;
+    height: 104px;
+    min-width: 96px;
+    min-height: 96px;
   }
 
   .tray-card .board-card-img {
-    width: 80px;
-    height: 76px;
+    width: 76px;
+    height: 72px;
+  }
+
+  .board-mystery-box {
+    width: auto;
+    flex: 0 0 auto;
+    gap: 6px;
+  }
+
+  .board-mystery-btn {
+    width: 74px;
+    height: 74px;
+    min-width: 72px;
+    min-height: 72px;
+    padding: 3px;
+    gap: 2px;
+  }
+
+  .board-mystery-thumb {
+    width: 56px;
+    height: 42px;
+  }
+
+  .board-mystery-label {
+    font-size: 12px;
+  }
+
+  .board-hint-card {
+    padding: 10px;
+    border-width: 5px;
+  }
+
+  .board-hint-matting {
+    padding: 10px;
+    gap: 8px;
+    border-width: 3px;
+  }
+
+  .board-hint-canvas {
+    width: 280px;
+    height: 140px;
+  }
+
+  .board-hint-caption {
+    font-size: 17px;
+    padding: 4px 10px;
   }
 
   .board-reaction-banner {
@@ -1725,26 +1910,86 @@ body > canvas {
   }
 
   .board-side-panel {
-    width: 148px;
-    flex: 0 0 148px;
+    width: 152px;
+    flex: 0 0 152px;
+    gap: 6px;
   }
 
   .board-tray-box {
-    padding: 8px 6px;
+    padding: 6px 4px;
     gap: 4px;
   }
 
-  .tray-card {
-    width: 102px;
-    height: 104px;
-    min-width: 98px;
+  .board-tray-slot {
     min-height: 98px;
-    padding: 4px;
+  }
+
+  .board-tray-hint {
+    font-size: 15px;
+  }
+
+  .tray-card {
+    width: 98px;
+    height: 98px;
+    min-width: 96px;
+    min-height: 96px;
+    padding: 3px;
   }
 
   .tray-card .board-card-img {
-    width: 78px;
+    width: 74px;
+    height: 68px;
+  }
+
+  .board-mystery-box {
+    gap: 6px;
+  }
+
+  .board-mystery-btn {
+    width: 72px;
     height: 72px;
+    min-width: 72px;
+    min-height: 72px;
+    padding: 2px;
+    border-width: 2px;
+    gap: 2px;
+  }
+
+  .board-mystery-thumb {
+    width: 54px;
+    height: 42px;
+  }
+
+  .board-mystery-label {
+    font-size: 12px;
+    line-height: 1;
+  }
+
+  .board-hint-card {
+    padding: 8px;
+    border-width: 4px;
+  }
+
+  .board-hint-matting {
+    padding: 8px 12px;
+    gap: 6px;
+    border-width: 3px;
+  }
+
+  .board-hint-canvas {
+    width: 256px;
+    height: 128px;
+  }
+
+  .board-hint-caption {
+    font-size: 16px;
+    padding: 3px 10px;
+  }
+
+  .board-hint-close-btn {
+    min-height: 70px;
+    min-width: 156px;
+    font-size: 18px;
   }
 
   /* Pause card in 390px height: 3 rows x 70px + 2x8px + 20px = 246px <= 390px */

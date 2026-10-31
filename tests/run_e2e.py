@@ -340,24 +340,34 @@ def t08_world_poi_areas_and_zero_dead_taps(sess: QASession) -> None:
         await P.startGame({{ seed: 80 }});
         for (const qid of ['sheep', 'slime']) {{
           await P.completeQuest(qid);
-          for (let k = 0; k < 6; k++) await Promise.resolve();
-          P.stepFrames(60);
+          for (let w = 0; w < 20 && P.getState().scene !== 'booth'; w++) {{
+            P.stepFrames(12);
+            for (let k = 0; k < 6; k++) await Promise.resolve();
+          }}
           await P.boothChoose('crown');
           await P.boothSnap();
-          for (let k = 0; k < 6; k++) await Promise.resolve();
-          P.stepFrames(45);
+          for (let w = 0; w < 20 && P.getState().scene !== 'board'; w++) {{
+            P.stepFrames(12);
+            for (let k = 0; k < 6; k++) await Promise.resolve();
+          }}
           await P.boardDrop(qid, 'perfect');
-          for (let k = 0; k < 6; k++) await Promise.resolve();
-          P.stepFrames(150);
+          for (let w = 0; w < 20; w++) {{
+            P.stepFrames(12);
+            for (let k = 0; k < 6; k++) await Promise.resolve();
+          }}
           await P.continue();
+          for (let w = 0; w < 30 && P.getState().scene !== 'world'; w++) {{
+            P.stepFrames(12);
+            for (let k = 0; k < 6; k++) await Promise.resolve();
+          }}
+          P.stepFrames(12);
           for (let k = 0; k < 6; k++) await Promise.resolve();
-          P.stepFrames(100);
         }}
         await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
         const tgs = P.listTargets() || [];
         const bCat = tgs.find((t) => t && /cat/i.test(String(t.id || ''))) || tgs[0] || null;
         // Locate off-screen beacon edge arrow (#149 N3: >=72px, hidden when onScreen).
-        const hudBtns = Array.from(document.querySelectorAll('#hud button, #hud [role="button"], .beacon-arrow, #hud-beacon-arrow'))
+        const hudBtns = Array.from(document.querySelectorAll('#hud-beacon-btn, .hud-beacon-btn, #hud button, #hud [role="button"], .beacon-arrow, #hud-beacon-arrow'))
           .filter((el) => {{
             if (!el || el.hasAttribute('hidden')) return false;
             const cs = window.getComputedStyle(el);
@@ -689,6 +699,7 @@ def t26_board_reactions_confetti_fireworks_and_next_card(sess: QASession) -> Non
 
   res = sess.eval_json(
       """(async () => {
+        try { localStorage.removeItem('pageant_progress'); } catch (_) {}
         const P = window.__PAGEANT__;
         await P.startGame({ seed: 26 });
         await P.completeQuest('sheep');
@@ -724,6 +735,89 @@ def t26_board_reactions_confetti_fireworks_and_next_card(sess: QASession) -> Non
   assert res['dConfetti'] >= 150, f'@fx-audio/@pageant-ui: 完美 reaction confetti < 150: {res}'
   assert res['dFireworks'] >= 3, f'@fx-audio/@pageant-ui: 完美 reaction fireworks < 3 (§8.3): {res}'
   assert res['postScene'] == 'world', f'@core/@pageant-ui: did not return to world after NEXT card: {res}'
+
+  # Verify #172 Q3: 0 mystery "?" slots before quest 5, 2 mystery "?" slots (>=72px) after quest 5, tap opens picture hint.
+  q3 = sess.eval_json(
+      """(async () => {
+        const P = window.__PAGEANT__;
+        const visSlots = () => Array.from(document.querySelectorAll('#mystery-slot-dragon, #mystery-slot-pinksheep, .mystery-slot'))
+          .filter((el) => {
+            if (!el || el.hasAttribute('hidden')) return false;
+            const cs = window.getComputedStyle(el);
+            const r = el.getBoundingClientRect();
+            return cs.display !== 'none' && cs.visibility !== 'hidden' && r.width > 10 && r.height > 10;
+          });
+        // Open board in view mode at 1/10 -> expect 0 mystery slots
+        const chip = document.getElementById('hud-board-btn');
+        if (chip) {
+          chip._resetTapDebounce?.();
+          chip.click();
+        }
+        for (let k = 0; k < 6; k++) await Promise.resolve();
+        const slotsAt1 = visSlots().length;
+        await P.continue();
+        for (let k = 0; k < 6; k++) await Promise.resolve();
+
+        // Complete quests 2..5 -> at 5/10 open board -> expect 2 mystery slots >= 72x72 + tap hint modal
+        for (const qid of ['slime', 'cat', 'golem', 'snow']) {
+          await P.completeQuest(qid);
+          for (let w = 0; w < 20 && P.getState().scene !== 'booth'; w++) {
+            P.stepFrames(12);
+            for (let k = 0; k < 6; k++) await Promise.resolve();
+          }
+          await P.boothChoose('crown');
+          await P.boothSnap();
+          for (let w = 0; w < 20 && P.getState().scene !== 'board'; w++) {
+            P.stepFrames(12);
+            for (let k = 0; k < 6; k++) await Promise.resolve();
+          }
+          await P.boardDrop(qid, 'perfect');
+          for (let w = 0; w < 15; w++) {
+            P.stepFrames(12);
+            for (let k = 0; k < 6; k++) await Promise.resolve();
+          }
+          await P.continue();
+          for (let w = 0; w < 25 && P.getState().scene !== 'world'; w++) {
+            P.stepFrames(12);
+            for (let k = 0; k < 6; k++) await Promise.resolve();
+          }
+        }
+        P.stepFrames(12);
+        const chip5 = document.getElementById('hud-board-btn');
+        if (chip5) {
+          chip5._resetTapDebounce?.();
+          chip5.click();
+        }
+        for (let k = 0; k < 6; k++) await Promise.resolve();
+        await new Promise((r) => requestAnimationFrame(r));
+        const slots5 = visSlots();
+        const minDim = slots5.reduce((m, el) => {
+          const r = el.getBoundingClientRect();
+          return Math.min(m, Math.round(r.width), Math.round(r.height));
+        }, 999);
+        let hintOpened = false;
+        if (slots5[0]) {
+          const r = slots5[0].getBoundingClientRect();
+          const cx = r.left + r.width * 0.5;
+          const cy = r.top + r.height * 0.5;
+          slots5[0].dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: cx, clientY: cy, isPrimary: true }));
+          slots5[0].dispatchEvent(new PointerEvent('pointerup', { bubbles: true, clientX: cx, clientY: cy, isPrimary: true }));
+          slots5[0].click();
+          for (let k = 0; k < 6; k++) await Promise.resolve();
+          const modal = document.getElementById('board-hint-modal');
+          if (modal && !modal.hasAttribute('hidden')) {
+            const mcs = window.getComputedStyle(modal);
+            const mr = modal.getBoundingClientRect();
+            hintOpened = mcs.display !== 'none' && mcs.visibility !== 'hidden' && mr.width > 100 && mr.height > 80;
+          }
+        }
+        await P.continue();
+        return { slotsAt1, slotsAt5: slots5.length, minDim, hintOpened };
+      })()"""
+  )
+  assert q3['slotsAt1'] == 0 and q3['slotsAt5'] == 2 and q3['minDim'] >= 72 and q3['hintOpened'], (
+      f'@pageant-ui: #172 Q3 mystery "?" slots + picture hint check failed: {q3}'
+  )
 
 
 def t27_persistence_reload_pageant_progress_and_portrait_budget(sess: QASession) -> None:

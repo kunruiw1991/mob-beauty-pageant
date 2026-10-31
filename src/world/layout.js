@@ -587,26 +587,237 @@ export function buildWorldLayout(voxels) {
   set(14, 10, 66, B.GLOWSTONE);
 
   // ============================================================================
-  // 10. SW JUNGLE (17..33, 70..86), CREEPER CLEARING (26, 58) & PINK TULIP
+  // 10. SW JUNGLE (16..35, 69..87), CREEPER CLEARING (26, 58) & PINK TULIP (W3)
   // ============================================================================
-  // Creeper clearing around (26, 58)
-  for (let x = 22; x <= 31; x++) {
-    for (let z = 54; z <= 62; z++) {
-      if (get(x, 7, z) !== B.AIR && Math.hypot(x - 26.5, z - 58.5) < 4.5) {
+  const segDist2D = (px, pz, ax, az, bx, bz) => {
+    const vx = bx - ax, vz = bz - az;
+    const len2 = vx * vx + vz * vz;
+    const t = len2 > 0 ? Math.max(0, Math.min(1, ((px - ax) * vx + (pz - az) * vz) / len2)) : 0;
+    return Math.hypot(px - (ax + vx * t), pz - (az + vz * t));
+  };
+
+  // Bulge SW peninsula lobe so entire SW Jungle sits on lush solid ground (staying x >= 16 so chunk (0,5) stays empty!)
+  for (let x = 16; x <= 35; x++) {
+    for (let z = 69; z <= 88; z++) {
+      if (inCornerChunk(x, z)) continue;
+      if (Math.hypot(x - 16, z - 66) <= 8.9) continue; // preserve lava-ring prison
+      const nd = Math.hypot((x - 25.8) / 10.6, (z - 78.2) / 10.2) + Math.sin(x * 0.45 + z * 0.35) * 0.04;
+      if (nd <= 1.04 && get(x, 7, z) === B.AIR) {
+        fill(x, 4, z, x, 6, z, B.DIRT);
+        set(x, 7, z, nd > 0.96 ? B.SAND : B.GRASS);
+      } else if (nd <= 0.94 && get(x, 7, z) === B.SAND) {
+        set(x, 7, z, B.GRASS);
+      }
+    }
+  }
+
+  // Creeper clearing around (27.5, 58.5) — keeps all backoff, shuffle & chicken orbit spots open
+  for (let x = 22; x <= 32; x++) {
+    for (let z = 54; z <= 63; z++) {
+      if (get(x, 7, z) !== B.AIR && Math.hypot(x - 27.2, z - 58.5) < 5.3) {
         set(x, 7, z, B.GRASS);
         clearAir(x, 8, z, x, 12, z);
       }
     }
   }
-  // Jungle canopy trees + fallen logs for cat sneak quest (staying x >= 16 so chunk (0,5) stays ocean!)
-  placeTree(19, 8, 74, B.JUNGLE_LOG, B.JUNGLE_LEAVES, 7, true);
-  placeTree(29, 8, 75, B.JUNGLE_LOG, B.JUNGLE_LEAVES, 7, true);
-  placeTree(22, 8, 83, B.JUNGLE_LOG, B.JUNGLE_LEAVES, 6, true);
-  placeTree(31, 8, 83, B.JUNGLE_LOG, B.JUNGLE_LEAVES, 6, true);
-  // Fallen jungle logs for 喵喵 to perch/leap
+
+  // Protected walkable SW Jungle clearings + connected jungle trails (#172 W3 & #176 Q1 exact sync)
+  const jungleClearings = [
+    [27.2, 58.5, 5.4], // Creeper clearing
+    [28.5, 66.5, 2.8], // Cat trailhead & prison east approach
+    [25.5, 66.5, 2.4], // poi.prison
+    [21.5, 77.5, 2.3], // Q1 cat perch 3
+    [20.5, 81.5, 2.3], // Q1 cat perch 1
+    [22.0, 74.0, 2.4], // NW jungle clearing
+    [24.5, 76.0, 2.2], // Central poi.jungle clearing (north of log 23..25,77)
+    [26.5, 78.5, 1.8], // Companion cat 2 clearing between logs
+    [29.5, 81.5, 2.3], // Q1 cat perch 4
+    [31.5, 80.5, 2.2], // Q1 cat perch 2
+    [31.5, 82.5, 2.3], // Q1 cat perch 0
+    [33.5, 72.5, 2.5], // H2 pinkTulip & Kai cameo edge
+    [40.0, 75.0, 4.6], // Quest 7 bee flower ring guard
+  ];
+  const jungleTrails = [
+    [28.5, 66.5, 22.5, 74.0, 1.6],
+    [22.5, 74.0, 24.5, 76.0, 1.6],
+    [22.5, 74.0, 21.5, 77.5, 1.6],
+    [21.5, 77.5, 20.5, 81.5, 1.6],
+    [20.5, 81.5, 29.5, 81.8, 1.55],
+    [26.5, 78.5, 31.5, 80.5, 1.55],
+    [31.5, 80.5, 33.5, 72.5, 1.6],
+    [33.5, 72.5, 28.5, 66.5, 1.55],
+  ];
+  const isJungleWalkZone = (px, pz) => {
+    if (Math.hypot(px - 16, pz - 66) <= 9.1) return true; // never intrude on prison
+    for (const [cx, cz, cr] of jungleClearings) {
+      if (Math.hypot(px + 0.5 - cx, pz + 0.5 - cz) <= cr) return true;
+    }
+    for (const [ax, az, bx, bz, hw] of jungleTrails) {
+      if (segDist2D(px + 0.5, pz + 0.5, ax, az, bx, bz) <= hw) return true;
+    }
+    return false;
+  };
+
+  // Subtle mossy cobblestone stepping stones along the SW Jungle trails
+  for (let x = 18; x <= 34; x++) {
+    for (let z = 67; z <= 84; z++) {
+      if (inCornerChunk(x, z) || Math.hypot(x - 16, z - 66) <= 9.1) continue;
+      for (const [ax, az, bx, bz] of jungleTrails) {
+        if (segDist2D(x + 0.5, z + 0.5, ax, az, bx, bz) <= 0.72 && get(x, 7, z) === B.GRASS) {
+          if ((x * 5 + z * 3) % 4 === 0) set(x, 7, z, B.COBBLE);
+        }
+      }
+    }
+  }
+
+  // Towering 2x2-trunk MC Giant Jungle Trees with multi-tier canopies, hanging vines & South/side cocoa pods!
+  function placeGiantJungleTree(tx, ty, tz, height = 10, canopyScale = 1.0) {
+    // 2x2 thick JUNGLE_LOG trunk
+    for (let dx = 0; dx <= 1; dx++) {
+      for (let dz = 0; dz <= 1; dz++) {
+        const lx = tx + dx, lz = tz + dz;
+        if (inCornerChunk(lx, lz) || isJungleWalkZone(lx, lz)) continue;
+        set(lx, 7, lz, B.DIRT);
+        for (let y = ty; y < ty + height; y++) {
+          set(lx, y, lz, B.JUNGLE_LOG);
+        }
+      }
+    }
+    // Hanging orange MC Cocoa pods at eye/camera level (y = ty+2..ty+3) on South (+Z) & side bark faces!
+    const cocoaSpots = [
+      [tx, ty + 2, tz + 2],
+      [tx + 1, ty + 3, tz + 2],
+      [tx - 1, ty + 2, tz + 1],
+      [tx + 2, ty + 3, tz],
+      [tx + 1, ty + 2, tz - 1],
+    ];
+    for (const [cx, cy, cz] of cocoaSpots) {
+      if (!inCornerChunk(cx, cz) && get(cx, cy, cz) === B.AIR && hash2(cx * 3 + 1, cz * 7 + 2) < 0.85) {
+        set(cx, cy, cz, B.COCOA);
+      }
+    }
+    // Trunk vines clinging to bark below canopy
+    const trunkVines = [
+      [tx - 1, tz], [tx + 2, tz + 1], [tx, tz - 1], [tx + 1, tz + 2],
+    ];
+    for (const [vx, vz] of trunkVines) {
+      if (inCornerChunk(vx, vz)) continue;
+      for (let y = ty + 3; y < ty + height - 2; y++) {
+        if (get(vx, y, vz) === B.AIR) set(vx, y, vz, B.VINES);
+      }
+    }
+    // High multi-tier jungle canopy (y >= 13 -> 5 full blocks of trunk, cocoa & vines clearly visible below!)
+    const cxMid = tx + 0.5, czMid = tz + 0.5;
+    const tiers = [
+      [height - 3, 2.2 * canopyScale],
+      [height - 2, 3.3 * canopyScale],
+      [height - 1, 2.9 * canopyScale],
+      [height, 2.1 * canopyScale],
+      [height + 1, 1.3 * canopyScale],
+    ];
+    for (const [dy, rad] of tiers) {
+      const ly = ty + dy;
+      if (ly < 13) continue;
+      const rCeil = Math.ceil(rad + 0.5);
+      for (let ox = -rCeil; ox <= rCeil; ox++) {
+        for (let oz = -rCeil; oz <= rCeil; oz++) {
+          const lx = Math.round(cxMid + ox);
+          const lz = Math.round(czMid + oz);
+          if (inCornerChunk(lx, lz)) continue;
+          const dist = Math.hypot(lx - cxMid, lz - czMid);
+          if (dist <= rad + Math.sin(lx * 1.1 + lz * 0.9) * 0.25) {
+            if (get(lx, ly, lz) === B.AIR) set(lx, ly, lz, B.JUNGLE_LEAVES);
+            // Curtain of hanging jungle vines along outer canopy rim (y >= 10, non-blocking & non-pickable)
+            if (dy === height - 2 && dist >= rad - 0.75 && hash2(lx * 11, lz * 13) < 0.56) {
+              const vLen = 2 + (hash2(lx, lz) > 0.45 ? 1 : 0);
+              for (let vy = 1; vy <= vLen; vy++) {
+                if (ly - vy >= 10 && get(lx, ly - vy, lz) === B.AIR) {
+                  set(lx, ly - vy, lz, B.VINES);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // 7 Giant 2x2 Jungle Trees staged around the North, West, Center, East & SW/SE clearing flanks
+  placeGiantJungleTree(27, 8, 72, 10, 1.0);  // Central hero 2x2 tree directly north of lounging cat logs!
+  placeGiantJungleTree(16, 8, 76, 10, 1.0);  // West flank 2x2 giant tree
+  placeGiantJungleTree(29, 8, 75, 10, 0.95); // East-central 2x2 giant tree
+  placeGiantJungleTree(17, 8, 84, 9, 0.88);  // SW corner 2x2 giant tree
+  placeGiantJungleTree(34, 8, 83, 9, 0.88);  // SE corner 2x2 giant tree
+  placeGiantJungleTree(33, 8, 63, 9, 0.95);  // NE jungle gate 2x2 giant tree
+  placeGiantJungleTree(19, 8, 55, 9, 0.92);  // NW clearing flank 2x2 giant tree
+  placeTree(35, 8, 76, B.JUNGLE_LOG, B.JUNGLE_LEAVES, 7, true);
+
+  // Fallen mossy jungle logs matching #176 companion lounging cats ((24.5,9,77.5) & (27.5,9,80.5)) + clearing border logs
   fill(23, 8, 77, 25, 8, 77, B.JUNGLE_LOG);
   fill(26, 8, 80, 28, 8, 80, B.JUNGLE_LOG);
-  fill(20, 8, 79, 21, 8, 79, B.JUNGLE_LOG);
+  const fallenJungleLogs = [
+    [23, 8, 84], [24, 8, 84],
+    [20, 8, 71], [21, 8, 71],
+  ];
+  for (const [lx, ly, lz] of fallenJungleLogs) {
+    if (!inCornerChunk(lx, lz) && !isJungleWalkZone(lx, lz) && get(lx, 7, lz) !== B.AIR) {
+      set(lx, ly, lz, B.JUNGLE_LOG);
+    }
+  }
+
+  // Tall segmented 3D Bamboo groves around clearings & trails
+  const bambooStalks = [
+    [18, 78, 5], [18, 79, 6], [19, 79, 4], [18, 82, 5],
+    [22, 85, 5], [23, 85, 6], [26, 84, 5], [27, 85, 6], [28, 84, 4],
+    [33, 78, 5], [34, 78, 6], [34, 79, 4],
+    [25, 71, 4], [25, 72, 5], [21, 70, 5],
+    [31, 76, 5], [32, 76, 6], [32, 77, 4],
+    [31, 68, 5], [32, 68, 6], [32, 69, 4],
+    [33, 59, 5], [33, 60, 4], [21, 56, 4], [21, 57, 5],
+  ];
+  for (const [bx, bz, bh] of bambooStalks) {
+    if (inCornerChunk(bx, bz) || isJungleWalkZone(bx, bz) || get(bx, 7, bz) === B.AIR) continue;
+    set(bx, 7, bz, B.GRASS);
+    for (let y = 8; y < 8 + bh; y++) {
+      if (get(bx, y, bz) === B.AIR) set(bx, y, bz, B.BAMBOO);
+    }
+  }
+
+  // Striped wild MC Melon patches nestled in the jungle undergrowth
+  const melonBlocks = [
+    [22, 83], [21, 84], [25, 84],
+    [30, 85], [31, 85],
+    [26, 74], [22, 79], [29, 78],
+    [31, 70], [32, 70],
+    [18, 80], [34, 81],
+  ];
+  for (const [mx, mz] of melonBlocks) {
+    if (!inCornerChunk(mx, mz) && !isJungleWalkZone(mx, mz) && get(mx, 7, mz) !== B.AIR && get(mx, 8, mz) === B.AIR) {
+      set(mx, 7, mz, B.GRASS);
+      set(mx, 8, mz, B.MELON);
+    }
+  }
+
+  // Lush non-blocking MC Ferns framing clearings, logs, bamboo & tree roots
+  for (let x = 16; x <= 35; x++) {
+    for (let z = 55; z <= 86; z++) {
+      if (inCornerChunk(x, z) || Math.hypot(x - 16, z - 66) <= 9.2) continue;
+      if (x === 33 && z === 72) continue; // keep H2 Pink Tulip exact!
+      if (Math.hypot(x - 40, z - 75) <= 4.5) continue; // keep Bee Ring exact!
+      let onExactPerch = false;
+      for (const [px, pz] of [
+        [21.5, 77.5], [20.5, 81.5], [29.5, 81.5], [31.5, 80.5], [31.5, 82.5],
+        [24.5, 76.0], [26.5, 78.5], [26.5, 58.5],
+      ]) {
+        if (Math.hypot(x + 0.5 - px, z + 0.5 - pz) < 1.35) onExactPerch = true;
+      }
+      if (onExactPerch) continue;
+      if (get(x, 7, z) === B.GRASS && get(x, 8, z) === B.AIR && hash2(x * 17 + 3, z * 19 + 5) < 0.28) {
+        set(x, 8, z, B.FERN);
+      }
+    }
+  }
+
   // Hidden H2 Pink Tulip at the jungle-meadow edge (33, 8, 72)
   set(33, 7, 72, B.GRASS);
   set(33, 8, 72, B.PINK_TULIP);
@@ -746,49 +957,222 @@ export function buildWorldLayout(voxels) {
   }
 
   // ============================================================================
-  // 12. NETHER POCKET: x in [192,240), z in [16,64), centre (216, 8, 40)
+  // 12. NETHER POCKET: x in [192,240), z in [16,64), centre (216, 8, 40) — W2 Overhaul
   // ============================================================================
-  for (let x = 196; x <= 236; x++) {
-    for (let z = 19; z <= 61; z++) {
-      const dx = (x - 216) / 20;
-      const dz = (z - 40) / 20;
-      if (Math.hypot(dx, dz) <= 1.0) {
-        fill(x, 5, z, x, 7, z, B.NETHERRACK);
+  // Organic scalloped Nether island base (netherrack & soul-sand valley floor)
+  for (let x = 195; x <= 237; x++) {
+    for (let z = 18; z <= 61; z++) {
+      const dx = (x - 216) / 20.8;
+      const dz = (z - 40) / 21.2;
+      const jag = Math.sin(x * 0.65 + z * 0.5) * 0.05;
+      if (Math.hypot(dx, dz) + jag <= 1.02) {
+        fill(x, 4, z, x, 7, z, B.NETHERRACK);
       }
     }
   }
 
-  // Nether Exit Portal Arch at (216.5, 8, 58.5)
-  fill(215, 7, 58, 218, 7, 58, B.OBSIDIAN);
-  fill(215, 8, 58, 215, 12, 58, B.OBSIDIAN);
-  fill(218, 8, 58, 218, 12, 58, B.OBSIDIAN);
-  fill(215, 12, 58, 218, 12, 58, B.OBSIDIAN);
-  clearAir(216, 8, 58, 217, 11, 58);
+  // Protected walkable floor zones (y=8/9 clear sky so surfaceY & A* stay 100% clean)
+  const isNetherWalkableCorridor = (px, pz) => {
+    // South arrival courtyard & exit portal approach
+    if (px >= 211 && px <= 221 && pz >= 48 && pz <= 59) return true;
+    // Fortress bridge deck & battlements footprint
+    if (px >= 212 && px <= 220 && pz >= 33 && pz <= 47) return true;
+    // North Wither Altar plaza & summon stage
+    if (px >= 212 && px <= 220 && pz >= 22 && pz <= 32) return true;
+    // West Soul-Sand Valley + south/north shore walkways
+    if (px >= 202 && px <= 209 && pz >= 25 && pz <= 53) return true;
+    if (px >= 208 && px <= 212 && ((pz >= 49 && pz <= 54) || (pz >= 28 && pz <= 33))) return true;
+    // East Nether Terrace + south/north shore walkways
+    if (px >= 226 && px <= 229 && pz >= 28 && pz <= 52) return true;
+    if (px >= 220 && px <= 226 && ((pz >= 50 && pz <= 54) || (pz >= 28 && pz <= 33))) return true;
+    return false;
+  };
 
-  // Nether-Brick Fortress Bridge (x: 213..219, z: 33..47, deck block y=8 -> walkable top y=9!)
-  fill(213, 8, 33, 219, 8, 47, B.NETHER_BRICK);
-  // North & south wide open access stairs (z=33 and z=47 stay y=8 -> step-up = 1 from y=8 ground!)
-  for (let z = 34; z <= 46; z++) {
-    set(213, 9, z, B.NETHER_BRICK);
-    set(219, 9, z, B.NETHER_BRICK);
-    if (z % 3 === 1) {
-      set(213, 10, z, B.NETHER_BRICK);
-      set(219, 10, z, B.NETHER_BRICK);
+  // Sculpted Netherrack Hills & Perimeter Cliffs (y = 8..16) around the valley & arrival rim!
+  for (let x = 195; x <= 237; x++) {
+    for (let z = 18; z <= 61; z++) {
+      if (get(x, 7, z) === B.AIR || isNetherWalkableCorridor(x, z)) continue;
+      // Leave Lava Lake channels (x: 209..211 & 221..225, z: 34..49) open for glowing lava!
+      if (((x >= 209 && x <= 211) || (x >= 221 && x <= 225)) && z >= 34 && z <= 49) continue;
+
+      let hillH = 0;
+      // West Netherrack Ridge (x <= 201)
+      if (x <= 201) {
+        hillH = Math.min(8, Math.round((202 - x) * 1.35 + Math.sin(z * 0.45 + x * 0.3) * 1.4));
+      }
+      // East Netherrack Ridge (x >= 230)
+      if (x >= 230) {
+        hillH = Math.max(hillH, Math.min(8, Math.round((x - 229) * 1.4 + Math.cos(z * 0.42 - x * 0.25) * 1.4)));
+      }
+      // North Altar Backdrop Cliffs (z <= 21)
+      if (z <= 21) {
+        hillH = Math.max(hillH, Math.min(7, Math.round((22 - z) * 1.6 + Math.sin(x * 0.5) * 1.2)));
+      }
+      // SW & SE Arrival Portal Crags (z >= 55 outside central portal lane)
+      if (z >= 55 && (x <= 210 || x >= 222)) {
+        hillH = Math.max(hillH, Math.min(5, Math.round((z - 54) * 1.1 + Math.cos(x * 0.6) * 1.1)));
+      }
+      if (hillH >= 1) {
+        const useBasaltCap = hillH >= 4 && hash2(x * 7, z * 11) < 0.22;
+        fill(x, 8, z, x, 7 + hillH, z, B.NETHERRACK);
+        if (useBasaltCap) set(x, 7 + hillH, z, B.BASALT);
+      }
     }
   }
-  // Fortress Glowstone lanterns
-  set(213, 11, 37, B.GLOWSTONE);
-  set(219, 11, 37, B.GLOWSTONE);
-  set(213, 11, 43, B.GLOWSTONE);
-  set(219, 11, 43, B.GLOWSTONE);
 
-  // Soul Sand Patch (x: 202..209, z: 37..44)
-  fill(202, 7, 37, 209, 7, 44, B.SOUL_SAND);
-  // 4 raised Soul Sand blocks ready to dig in Quest 9!
+  // Glowing Bubbling Lava Lake Channels flanking the Fortress Bridge (scenery, walkable=false!)
+  for (let z = 34; z <= 49; z++) {
+    for (const lx of [209, 210, 211, 221, 222, 223, 224, 225]) {
+      // Taper north & south tips organically
+      if ((z === 34 || z === 49) && (lx === 209 || lx === 225)) continue;
+      fill(lx, 4, z, lx, 6, z, B.NETHERRACK);
+      set(lx, 7, z, B.LAVA);
+      clearAir(lx, 8, z, lx, 16, z);
+    }
+  }
+
+  // Grand Nether-Brick Fortress Bridge spanning the Lava Lake (walkable deck x: 213..219, z: 33..47, top y=9!)
+  fill(212, 7, 33, 220, 8, 47, B.NETHER_BRICK);
+  // Fortress support piers plunging into the Lava Lake edges
+  for (const pz of [36, 41, 46]) {
+    fill(211, 5, pz, 212, 8, pz, B.NETHER_BRICK);
+    fill(220, 5, pz, 221, 8, pz, B.NETHER_BRICK);
+  }
+  // Crenellated Nether-Brick battlements along x=212 & x=220 (keeping x=213..219 wide open 7-block deck for 3 Wither Skeletons!)
+  for (let z = 34; z <= 46; z++) {
+    set(212, 9, z, B.NETHER_BRICK);
+    set(220, 9, z, B.NETHER_BRICK);
+    if (z % 2 === 0) {
+      set(212, 10, z, B.NETHER_BRICK);
+      set(220, 10, z, B.NETHER_BRICK);
+    }
+  }
+  // Bridge beacon towers + Glowstone lanterns + Fortress Gate Arch at z=36
+  for (const lz of [36, 41, 46]) {
+    set(212, 10, lz, B.NETHER_BRICK); set(212, 11, lz, B.GLOWSTONE);
+    set(220, 10, lz, B.NETHER_BRICK); set(220, 11, lz, B.GLOWSTONE);
+  }
+  fill(212, 11, 36, 212, 14, 36, B.NETHER_BRICK);
+  fill(220, 11, 36, 220, 14, 36, B.NETHER_BRICK);
+  fill(212, 14, 36, 220, 14, 36, B.NETHER_BRICK);
+  set(213, 13, 36, B.NETHER_BRICK); set(219, 13, 36, B.NETHER_BRICK);
+  set(216, 13, 36, B.GLOWSTONE); set(215, 13, 36, B.GLOWSTONE); set(217, 13, 36, B.GLOWSTONE);
+  set(216, 12, 36, B.GLOWSTONE);
+
+  // Bridge corner Soul-Sand + Nether Wart planters (south entrance z=47 & north exit z=33)
+  for (const [px, pz] of [[212, 47], [220, 47], [212, 33], [220, 33]]) {
+    set(px, 8, pz, B.SOUL_SAND);
+    set(px, 9, pz, B.NETHER_WART);
+  }
+
+  // Basalt Pillars erupting from the Lava Lake & Valley Rims (some crowned with Soul-Fire braziers!)
+  const basaltPillars = [
+    [210, 46, 11, true],
+    [210, 39, 12, false],
+    [209, 43, 9, false],
+    [223, 47, 11, true],
+    [224, 41, 13, false],
+    [222, 37, 10, false],
+    [201, 43, 13, false],
+    [201, 36, 14, true],
+    [230, 48, 13, false],
+    [230, 35, 14, false],
+    [208, 55, 11, true],
+    [224, 55, 11, false],
+  ];
+  for (const [bx, bz, topY, hasFire] of basaltPillars) {
+    fill(bx, 7, bz, bx, topY, bz, B.BASALT);
+    if (hasFire) set(bx, topY + 1, bz, B.SOUL_FIRE);
+  }
+
+  // Hanging Golden Glowstone Stalactite Clusters anchored cleanly to Cliff Overhangs!
+  // West cliff overhang spurs + dripping Glowstone clusters
+  fill(198, 14, 39, 202, 15, 41, B.NETHERRACK);
+  fill(201, 13, 40, 202, 14, 40, B.GLOWSTONE);
+  set(202, 12, 40, B.GLOWSTONE); set(201, 12, 41, B.GLOWSTONE);
+
+  fill(200, 13, 51, 203, 14, 53, B.NETHERRACK);
+  fill(202, 11, 52, 203, 12, 52, B.GLOWSTONE);
+  set(202, 10, 52, B.GLOWSTONE);
+
+  // East cliff overhang spurs + dripping Glowstone clusters
+  fill(229, 14, 38, 233, 15, 40, B.NETHERRACK);
+  fill(229, 13, 39, 230, 14, 39, B.GLOWSTONE);
+  set(229, 12, 39, B.GLOWSTONE); set(230, 12, 40, B.GLOWSTONE);
+
+  fill(229, 13, 46, 232, 14, 48, B.NETHERRACK);
+  fill(229, 11, 47, 230, 12, 47, B.GLOWSTONE);
+  set(229, 10, 47, B.GLOWSTONE);
+
+  // North Altar cliff crown cluster
+  fill(214, 14, 19, 218, 15, 21, B.NETHERRACK);
+  fill(215, 13, 20, 217, 13, 20, B.GLOWSTONE);
+  set(216, 12, 20, B.GLOWSTONE); set(216, 11, 20, B.GLOWSTONE);
+
+  // Dramatic Fenced Lava Falls pouring down West, East & North Netherrack Cliffs!
+  // West Cliff Fenced Lava Fall (x=200, z=46..48 — right in arrival left view!)
+  fill(199, 8, 45, 201, 15, 49, B.NETHERRACK);
+  fill(200, 7, 45, 201, 8, 49, B.NETHER_BRICK);
+  fill(200, 8, 46, 200, 14, 48, B.LAVA);
+  fill(201, 8, 46, 201, 8, 48, B.NETHER_BRICK);
+  fill(201, 9, 46, 201, 14, 48, B.IRON_BARS);
+
+  // East Cliff Fenced Lava Fall (x=231, z=42..44 — right in arrival right view!)
+  fill(230, 8, 41, 232, 16, 45, B.NETHERRACK);
+  fill(230, 7, 41, 231, 8, 45, B.NETHER_BRICK);
+  fill(231, 8, 42, 231, 15, 44, B.LAVA);
+  fill(230, 8, 42, 230, 8, 44, B.NETHER_BRICK);
+  fill(230, 9, 42, 230, 15, 44, B.IRON_BARS);
+
+  // Twin North Cliff Fenced Lava Columns flanking Wither Altar (x=210 & 222, z=20)
+  for (const nx of [210, 222]) {
+    fill(nx - 1, 8, 19, nx + 1, 15, 21, B.NETHERRACK);
+    set(nx, 8, 21, B.NETHER_BRICK);
+    fill(nx, 8, 20, nx, 14, 20, B.LAVA);
+    fill(nx, 9, 21, nx, 14, 21, B.IRON_BARS);
+  }
+
+  // Soul-Sand Valley (x: 202..209, z: 33..53 + foreground tongue 210..213, 49..53) with Soul Soil & Blue Soul-Fire!
+  for (let x = 202; x <= 212; x++) {
+    for (let z = 33; z <= 53; z++) {
+      const inMainValley = x <= 209 && z >= 34 && z <= 53;
+      const inFrontTongue = x >= 209 && x <= 212 && z >= 49 && z <= 53;
+      if (!inMainValley && !inFrontTongue) continue;
+      if (get(x, 7, z) === B.LAVA || get(x, 7, z) === B.AIR) continue;
+      set(x, 7, z, (hash2(x * 5, z * 7) < 0.45) ? B.SOUL_SOIL : B.SOUL_SAND);
+    }
+  }
+  // 4 raised Soul Sand blocks ready to dig in Quest 9 (matching q_wither LAYOUT_EXTRA_SAND)
   set(204, 8, 39, B.SOUL_SAND);
   set(207, 8, 39, B.SOUL_SAND);
   set(204, 8, 42, B.SOUL_SAND);
   set(207, 8, 42, B.SOUL_SAND);
+  // Ensure East Terrace Soul Sand pockets under q_wither breakables (226,49) & (226,29) look authentic
+  fill(225, 7, 48, 227, 7, 50, B.SOUL_SAND);
+  fill(225, 7, 28, 227, 7, 30, B.SOUL_SAND);
+
+  // Flickering Cyan-Blue Soul-Fire flames across the Soul-Sand Valley (non-blocking, non-pickable, emissive!)
+  const soulFireSpots = [
+    [210, 8, 51], [206, 8, 50], [203, 8, 48],
+    [206, 8, 45], [203, 8, 43], [205, 8, 40],
+    [203, 8, 37], [206, 8, 35], [208, 8, 36],
+  ];
+  for (const [sfx, sfy, sfz] of soulFireSpots) {
+    if (get(sfx, sfy, sfz) === B.AIR) set(sfx, sfy, sfz, B.SOUL_FIRE);
+  }
+
+  // Crimson Nether Wart beds framing Arrival, East Terrace & North Bridge (non-blocking, non-pickable!)
+  const netherWartSpots = [
+    [213, 50], [213, 51], [219, 50], [219, 51], [220, 50],
+    [227, 42], [227, 43], [228, 43], [227, 36],
+    [212, 31], [220, 31],
+  ];
+  for (const [wx, wz] of netherWartSpots) {
+    if (get(wx, 7, wz) !== B.AIR && get(wx, 7, wz) !== B.LAVA && get(wx, 8, wz) === B.AIR) {
+      set(wx, 7, wz, B.SOUL_SAND);
+      set(wx, 8, wz, B.NETHER_WART);
+    }
+  }
 
   // Wither Altar (x: 213..219, z: 22..28)
   fill(213, 7, 22, 219, 7, 28, B.NETHER_BRICK);
@@ -797,14 +1181,12 @@ export function buildWorldLayout(voxels) {
   set(213, 8, 28, B.NETHER_BRICK); set(213, 9, 28, B.GLOWSTONE);
   set(219, 8, 28, B.NETHER_BRICK); set(219, 9, 28, B.GLOWSTONE);
 
-  // Dramatic Fenced Lava Falls on East & West Nether cliffs (scenery, fenced with Nether Brick!)
-  for (const lx of [199, 232]) {
-    fill(lx - 1, 7, 38, lx + 1, 8, 42, B.NETHER_BRICK);
-    fill(lx, 8, 39, lx, 18, 41, B.LAVA);
-    fill(lx - 1, 8, 39, lx - 1, 20, 41, lx === 199 ? B.NETHERRACK : B.IRON_BARS);
-    fill(lx + 1, 8, 39, lx + 1, 20, 41, lx === 232 ? B.NETHERRACK : B.IRON_BARS);
-    fill(lx - 1, 18, 38, lx + 1, 20, 42, B.NETHERRACK);
-  }
+  // Nether Exit Portal Arch at (216.5, 8, 58.5)
+  fill(215, 7, 58, 218, 7, 58, B.OBSIDIAN);
+  fill(215, 8, 58, 215, 12, 58, B.OBSIDIAN);
+  fill(218, 8, 58, 218, 12, 58, B.OBSIDIAN);
+  fill(215, 12, 58, 218, 12, 58, B.OBSIDIAN);
+  clearAir(216, 8, 58, 217, 11, 58);
 
   // ============================================================================
   // 13. ALL 33 BINDING `poi` KEYS (§5) + EXTRA LANDMARKS
@@ -839,7 +1221,7 @@ export function buildWorldLayout(voxels) {
     endArrive: { x: 152.5, y: 8, z: 54.5 },
     endCage: { x: 159.5, y: 8, z: 40.5 },
     dragonEgg: { x: 153.5, y: 17, z: 26.5 },
-    netherArrive: { x: 216.5, y: 8, z: 54.5 },
+    netherArrive: { x: 216.5, y: 8, z: 53.5 },
     fortress: { x: 216.5, y: 9, z: 40.5 },
     soulSand: { x: 205.5, y: 8, z: 40.5 },
     witherAltar: { x: 216.5, y: 8, z: 26.5 },

@@ -25,26 +25,31 @@ import {
 
 const SNEAK_RADIUS = 10.0;
 const SNEAK_SPEED = 1.6;
-const NEED_FISH = 4;
+const NEED_FISH = 5;
+const LOG_PERCH_LIFT = 0.34;
 
 let catActor = null;
 let catUnpick = null;
-let ambientCat = null;
+let ambientCats = [];
+let junglePropsGroup = null;
 let ringMesh = null;
 let fishGroup = null;
 let hatGiftGroup = null;
 let timers = null;
 
-// 4 lush green-grass jungle perches across the SW clearing (~14-20b apart; perch 0 is 13.9b from start >= 12b!)
-const LOG_SPOTS = [
-  { x: 24.5, y: 8.0, z: 74.5 },
-  { x: 42.5, y: 8.0, z: 66.5 },
-  { x: 24.5, y: 8.0, z: 72.5 },
-  { x: 40.5, y: 8.0, z: 76.5 },
+// 5 deep SW Jungle clearings/log perches (x: 20..32, z: 76..83 — video 0:15 cats-in-the-jungle vibe, #172 Q1;
+// perch 0 at (31.5, 82.5) is 16.3b from SW jungle trailhead (28.5, 66.5) >= 12b, well south of prison & west of plaza!)
+const LOG_SPOTS_BASE = [
+  { x: 31.5, y: 8.0, z: 82.5 },
+  { x: 20.5, y: 8.0, z: 81.5 },
+  { x: 31.5, y: 8.0, z: 80.5 },
+  { x: 21.5, y: 8.0, z: 77.5 },
+  { x: 29.5, y: 8.0, z: 81.5 },
 ];
 
+let activeSpots = LOG_SPOTS_BASE.map((s) => ({ ...s }));
 let logIndex = 0;
-let catPos = { x: 24.5, y: 8.0, z: 74.5 };
+let catPos = { x: 30.5, y: 8.34, z: 81.5 };
 let lookState = 'away'; // 'away' | 'tell' | 'peek'
 let stateTimer = 3.4;
 let peekGrace = 0;
@@ -79,6 +84,77 @@ function buildStolenKaiHatProp() {
   g.add(crown, brim, badge);
   g.visible = false;
   return g;
+}
+
+function resolveWalkableJungleCell(ctx, baseX, baseZ, origin, prevSpot = null) {
+  const w = ctx?.world;
+  if (!w?.isWalkable || !w?.surfaceY) {
+    return { x: baseX, y: 8.0, z: baseZ };
+  }
+  const ox = Math.floor(origin?.x ?? 28.5);
+  const oz = Math.floor(origin?.z ?? 66.5);
+  const oy = w.surfaceY(ox, oz) || 8;
+  const cx0 = Math.floor(baseX);
+  const cz0 = Math.floor(baseZ);
+
+  let bestCand = null;
+  let bestDist = -1;
+  for (let r = 0; r <= 8; r++) {
+    for (let dx = -r; dx <= r; dx++) {
+      for (let dz = -r; dz <= r; dz++) {
+        if (Math.abs(dx) !== r && Math.abs(dz) !== r) continue;
+        const bx = cx0 + dx;
+        const bz = cz0 + dz;
+        if (bx < 18 || bx > 32 || bz < 74 || bz > 85) continue;
+        // Stay well clear of prison lava moat around (16, 66), r <= 10.2
+        if (Math.hypot(bx - 16, bz - 66) <= 10.2) continue;
+        const sy = w.surfaceY(bx, bz);
+        if (sy < 8 || sy > 9) continue;
+        if (!w.isWalkable(bx, sy, bz)) continue;
+        const bFloor = w.getBlock ? w.getBlock(bx, sy - 1, bz) : 1;
+        if (bFloor === 0 || bFloor === 43) continue;
+        if (w.findPath) {
+          const path = w.findPath({ x: ox, y: oy, z: oz }, { x: bx, y: sy, z: bz });
+          if (!path || path.length === 0) continue;
+        }
+        const cand = { x: bx + 0.5, y: sy, z: bz + 0.5 };
+        if (!prevSpot) return cand;
+        const dPrev = distXZ(cand, prevSpot);
+        if (dPrev >= 8.2) return cand;
+        if (dPrev > bestDist) {
+          bestDist = dPrev;
+          bestCand = cand;
+        }
+      }
+    }
+  }
+  return bestCand || { x: baseX, y: surfaceY(ctx, baseX, baseZ, 8), z: baseZ };
+}
+
+function buildJunglePerchLogs(spots) {
+  const root = new THREE.Group();
+  spots.forEach((sp, idx) => {
+    const logG = new THREE.Group();
+    logG.position.set(sp.x, sp.y, sp.z);
+    logG.rotation.y = idx * 0.65;
+
+    // Voxel-proportioned mossy jungle stump perch + fern tufts
+    const bark = new THREE.Mesh(sharedBoxGeo(0.76, 0.34, 0.76), sharedLambertMat(0x5c3c1e));
+    bark.position.y = 0.17;
+    const rings = new THREE.Mesh(sharedBoxGeo(0.62, 0.02, 0.62), sharedLambertMat(0xd4a373));
+    rings.position.y = 0.345;
+    const moss = new THREE.Mesh(sharedBoxGeo(0.42, 0.03, 0.42), sharedLambertMat(0x40916c));
+    moss.position.set(0.12, 0.35, -0.1);
+
+    const fern1 = new THREE.Mesh(sharedBoxGeo(0.18, 0.34, 0.18), sharedLambertMat(0x2d6a4f));
+    fern1.position.set(-0.46, 0.17, 0.32);
+    const fern2 = new THREE.Mesh(sharedBoxGeo(0.16, 0.28, 0.16), sharedLambertMat(0x52b788));
+    fern2.position.set(0.44, 0.14, -0.3);
+
+    logG.add(bark, rings, moss, fern1, fern2);
+    root.add(logG);
+  });
+  return root;
 }
 
 function setLookPhase(ctx, nextPhase) {
@@ -117,12 +193,14 @@ function setLookPhase(ctx, nextPhase) {
 
 function hopCatToSpot(ctx, nextIdx, duration = 0.52) {
   const prevSpot = { ...catPos };
-  logIndex = nextIdx % LOG_SPOTS.length;
-  const dest = { ...LOG_SPOTS[logIndex] };
+  logIndex = nextIdx % activeSpots.length;
+  const sp = activeSpots[logIndex];
+  const dest = { x: sp.x, y: sp.y + LOG_PERCH_LIFT, z: sp.z };
   if (ringMesh) ringMesh.visible = false;
   leapArc = {
     from: prevSpot,
     to: dest,
+    groundY: sp.y,
     elapsed: 0,
     duration,
   };
@@ -147,7 +225,7 @@ function triggerSpookOrMercy(ctx) {
     return;
   }
 
-  hopCatToSpot(ctx, (logIndex + 1) % LOG_SPOTS.length, 0.48);
+  hopCatToSpot(ctx, (logIndex + 1) % activeSpots.length, 0.48);
 }
 
 function unlockFishInHand(ctx) {
@@ -178,16 +256,16 @@ function feedOneFish(ctx) {
   ctx?.events?.emit?.('questStep', { id: 'cat', step: fishFed });
 
   if (fishFed < NEED_FISH) {
-    // Playful shy cat purrs with hearts, then hops across the clearing to the next log perch!
+    // Playful shy cat purrs with hearts, then hops across the jungle clearing to the next mossy log perch!
     catActor?.setEmote?.('🐟');
     ctx?.fx?.hearts?.({ x: catPos.x, y: catPos.y + 0.9, z: catPos.z }, 7);
     roundLeaps = 0;
     mercyWalking = false;
-    hopCatToSpot(ctx, (logIndex + 1) % LOG_SPOTS.length, 0.68);
+    hopCatToSpot(ctx, (logIndex + 1) % activeSpots.length, 0.68);
     return;
   }
 
-  // 3rd fish -> fully tamed! Purr + gift (小凯's stolen hat, §6.3)!
+  // Final fish -> fully tamed! Purr + gift (小凯's stolen hat, §6.3)!
   finishing = true;
   setPlayerSneak(ctx, false);
   catActor?.setEmote?.('❤');
@@ -196,15 +274,16 @@ function feedOneFish(ctx) {
 
   timers.after(0.5, () => {
     if (hatGiftGroup) {
-      const gx = (catPos.x + pp.x) * 0.5;
-      const gz = (catPos.z + pp.z) * 0.5;
-      const gy = surfaceY(ctx, gx, gz, 8);
-      hatGiftGroup.position.set(gx, gy + 0.35, gz);
+      hatGiftGroup.scale.setScalar(1.45);
+      hatGiftGroup.position.set(catPos.x + 0.42, catPos.y + 0.48, catPos.z + 0.48);
       hatGiftGroup.visible = true;
-      ctx?.fx?.sparkles?.({ x: gx, y: gy + 0.5, z: gz }, 12, { toPlayer: true });
+      ctx?.fx?.sparkles?.({ x: catPos.x + 0.42, y: catPos.y + 0.65, z: catPos.z + 0.48 }, 14, { toPlayer: true });
     }
-    const kaiCameoPos = { x: 34.5, y: 8, z: 72.5 };
-    ctx?.rival?.loseHatCameo?.(kaiCameoPos, 'cat');
+    const kaiX = catPos.x - 1.55;
+    const kaiZ = catPos.z - 0.15;
+    const kaiSpot = { x: kaiX, y: surfaceY(ctx, kaiX, kaiZ, 8), z: kaiZ };
+    ctx?.rival?.loseHatCameo?.(kaiSpot, 'cat');
+    catActor?.lookAt?.({ x: catPos.x, y: catPos.y, z: catPos.z + 6.0 });
     catActor?.setAnim?.('cheer');
     emitGag(ctx, 'cat', 'cat_gift_kai_hat', catPos);
   });
@@ -264,11 +343,17 @@ const qCat = {
     const pp = playerPos(ctx);
     prevPlayerPos = { ...pp };
 
-    // Choose perch >= 12b away from player start (#143)
+    activeSpots = [];
+    for (const sp of LOG_SPOTS_BASE) {
+      const prev = activeSpots.length > 0 ? activeSpots[activeSpots.length - 1] : null;
+      activeSpots.push(resolveWalkableJungleCell(ctx, sp.x, sp.z, pp, prev));
+    }
+
+    // Choose deep jungle log perch >= 12b away from player start (#143, #172 Q1)
     logIndex = 0;
     let bestD = -1;
-    for (let i = 0; i < LOG_SPOTS.length; i++) {
-      const d = distXZ(pp, LOG_SPOTS[i]);
+    for (let i = 0; i < activeSpots.length; i++) {
+      const d = distXZ(pp, activeSpots[i]);
       if (d >= 12.0) {
         logIndex = i;
         break;
@@ -278,13 +363,17 @@ const qCat = {
         logIndex = i;
       }
     }
-    catPos = { ...LOG_SPOTS[logIndex] };
+    const sp0 = activeSpots[logIndex];
+    catPos = { x: sp0.x, y: sp0.y + LOG_PERCH_LIFT, z: sp0.z };
+
+    junglePropsGroup = buildJunglePerchLogs(activeSpots);
+    attachToScene(ctx, junglePropsGroup);
 
     ringMesh = new THREE.Mesh(
       sharedCylinderGeo(2.2, 2.2, 0.06, 20),
       sharedBasicMat(0x51cf66, { opacity: 0.48, transparent: true })
     );
-    ringMesh.position.set(catPos.x, 8.05, catPos.z);
+    ringMesh.position.set(catPos.x, sp0.y + 0.05, catPos.z);
     attachToScene(ctx, ringMesh);
 
     if (ctx?.chars?.create) {
@@ -298,8 +387,17 @@ const qCat = {
         hitRadius: 1.2,
       });
 
-      const ambPos = { x: 30.5, y: 8, z: 70.5 };
-      ambientCat = acquireActor(ctx, 'q_cat:ambient', 'catMob', { pos: ambPos, anim: 'idle' });
+      // Video 0:15 cats-in-the-jungle vibe: lounging jungle companions on nearby fallen logs!
+      const ambCoords = [
+        { x: 24.5, y: surfaceY(ctx, 24, 77, 9), z: 77.5, yaw: 0.6 },
+        { x: 27.5, y: surfaceY(ctx, 27, 80, 9), z: 80.5, yaw: -0.9 },
+        { x: 26.5, y: surfaceY(ctx, 26, 78, 8), z: 78.5, yaw: 2.1 },
+      ];
+      ambientCats = ambCoords.map((ap, idx) => {
+        const ac = acquireActor(ctx, `q_cat:ambient_${idx}`, 'catMob', { pos: ap, anim: 'idle' });
+        if (ac?.group) ac.group.rotation.y = ap.yaw;
+        return ac;
+      });
     }
 
     fishGroup = buildFishProp();
@@ -343,14 +441,15 @@ const qCat = {
       if (catActor?.group) catActor.group.position.set(catPos.x, catPos.y, catPos.z);
       if (u >= 1) {
         catPos = { ...leapArc.to };
+        const gy = leapArc.groundY ?? 8.0;
         leapArc = null;
         if (ringMesh) {
-          ringMesh.position.set(catPos.x, 8.05, catPos.z);
+          ringMesh.position.set(catPos.x, gy + 0.05, catPos.z);
         }
         setLookPhase(ctx, 'away');
       }
       catActor?.update?.(dt);
-      ambientCat?.update?.(dt);
+      for (const ac of ambientCats) ac?.update?.(dt);
       return;
     }
 
@@ -364,12 +463,12 @@ const qCat = {
         const dz = (pp.z - catPos.z) / d;
         catPos.x += dx * step;
         catPos.z += dz * step;
-        catPos.y = 8;
+        catPos.y = surfaceY(ctx, catPos.x, catPos.z, 8);
         if (catActor?.group) catActor.group.position.set(catPos.x, catPos.y, catPos.z);
         catActor?.lookAt?.(pp);
       }
       catActor?.update?.(dt);
-      ambientCat?.update?.(dt);
+      for (const ac of ambientCats) ac?.update?.(dt);
       return;
     }
 
@@ -385,7 +484,7 @@ const qCat = {
           // Red-light peeks actually catch movers (#143)!
           triggerSpookOrMercy(ctx);
           catActor?.update?.(dt);
-          ambientCat?.update?.(dt);
+          for (const ac of ambientCats) ac?.update?.(dt);
           return;
         }
       } else if (dToCat <= 2.15) {
@@ -409,7 +508,7 @@ const qCat = {
     }
 
     catActor?.update?.(dt);
-    ambientCat?.update?.(dt);
+    for (const ac of ambientCats) ac?.update?.(dt);
   },
 
   onTap(hit, ctx) {
@@ -536,8 +635,12 @@ const qCat = {
     catUnpick = null;
     if (catActor?.group) detachFromScene(catActor.group);
     catActor = null;
-    if (ambientCat?.group) detachFromScene(ambientCat.group);
-    ambientCat = null;
+    for (const ac of ambientCats) {
+      if (ac?.group) detachFromScene(ac.group);
+    }
+    ambientCats = [];
+    if (junglePropsGroup) detachFromScene(junglePropsGroup);
+    junglePropsGroup = null;
     if (ringMesh) detachFromScene(ringMesh);
     ringMesh = null;
     if (fishGroup) detachFromScene(fishGroup);

@@ -19,8 +19,32 @@ export function createWorld(ctx = {}) {
   const { poi, landmarks } = buildWorldLayout(voxels);
   initialVoxels.set(voxels);
 
+  function isColumnWalkableAt(colBase, by) {
+    if (by < 1 || by >= WY - 1) return false;
+    const belowId = voxels[colBase + by - 1];
+    if (belowId === 0 || !BLOCK_PROPS[belowId]?.walkable) return false;
+    const feetId = voxels[colBase + by];
+    if (feetId !== 0 && (BLOCK_PROPS[feetId]?.solid || BLOCK_PROPS[feetId]?.blocksWalk)) return false;
+    const headId = voxels[colBase + by + 1];
+    if (headId !== 0 && (BLOCK_PROPS[headId]?.solid || BLOCK_PROPS[headId]?.blocksWalk)) return false;
+    return true;
+  }
+
   function recomputeColumnSurface(bx, bz) {
     const colBase = (bx * WZ + bz) * WY;
+    // Prefer ground/log/bridge walkable surface first so overhead tree canopies or cave roofs never hijack surfaceY!
+    for (let y = 6; y <= 11; y++) {
+      if (isColumnWalkableAt(colBase, y)) {
+        surfaceCache[bx * WZ + bz] = y;
+        return;
+      }
+    }
+    for (let y = WY - 2; y >= 12; y--) {
+      if (isColumnWalkableAt(colBase, y)) {
+        surfaceCache[bx * WZ + bz] = y;
+        return;
+      }
+    }
     let sy = 0;
     for (let y = WY - 1; y >= 0; y--) {
       const id = voxels[colBase + y];
@@ -321,6 +345,146 @@ export function createWorld(ctx = {}) {
     }
   }
 
+  // Nether ambient life (#172 W2): 72 rising fiery + soul-blue ember particles (1 InstancedMesh) +
+  // 3 ambient Fortress Bridge Wither Skeletons when q_wither isn't active (hands off cleanly during Quest 9!)
+  const netherAmbientGroup = new THREE.Group();
+  netherAmbientGroup.name = 'netherAmbient';
+  netherAmbientGroup.visible = false;
+  if (ctx?.scene) {
+    ctx.scene.add(netherAmbientGroup);
+  }
+
+  const NETHER_EMBER_COUNT = 72;
+  const netherEmberGeo = new THREE.BoxGeometry(0.17, 0.17, 0.17);
+  const netherEmberMat = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0.92,
+    toneMapped: false,
+    fog: false,
+  });
+  const netherEmbers = new THREE.InstancedMesh(netherEmberGeo, netherEmberMat, NETHER_EMBER_COUNT);
+  netherEmbers.frustumCulled = false;
+  netherEmbers.name = 'netherEmberParticles';
+  const netherEmberSpecs = [];
+  const firePalette = [
+    new THREE.Color(0xff6b1a),
+    new THREE.Color(0xff922b),
+    new THREE.Color(0xffd43b),
+    new THREE.Color(0xfff3bf),
+  ];
+  const soulPalette = [
+    new THREE.Color(0x22d3ee),
+    new THREE.Color(0x38d9f5),
+    new THREE.Color(0xa5f8ff),
+  ];
+  let emberSeed = 0x6c8e9cf5;
+  const nextEmberRnd = () => {
+    emberSeed = (emberSeed * 1664525 + 1013904223) >>> 0;
+    return emberSeed / 4294967296;
+  };
+  for (let i = 0; i < NETHER_EMBER_COUNT; i++) {
+    const isSoul = i >= 48;
+    let ex, ez, yBase;
+    if (isSoul) {
+      ex = 202.2 + nextEmberRnd() * 9.6;
+      ez = 35.0 + nextEmberRnd() * 17.5;
+      yBase = 8.15 + nextEmberRnd() * 2.2;
+    } else if (i % 3 === 0) {
+      // Directly over West & East Lava Lakes + Fortress Bridge
+      const east = (i & 1) === 0;
+      ex = east ? (220.6 + nextEmberRnd() * 3.8) : (208.8 + nextEmberRnd() * 3.4);
+      ez = 35.0 + nextEmberRnd() * 13.5;
+      yBase = 7.8 + nextEmberRnd() * 2.8;
+    } else {
+      ex = 200.0 + nextEmberRnd() * 32.0;
+      ez = 33.0 + nextEmberRnd() * 21.0;
+      yBase = 8.3 + nextEmberRnd() * 3.8;
+    }
+    netherEmberSpecs.push({
+      x: ex,
+      yBase,
+      z: ez,
+      phase: nextEmberRnd() * Math.PI * 2,
+      speed: (isSoul ? 0.75 : 1.05) + nextEmberRnd() * 0.85,
+      scale: 0.72 + nextEmberRnd() * 0.85,
+      riseSpan: isSoul ? 3.8 : 5.4,
+    });
+    netherEmbers.setColorAt(
+      i,
+      isSoul ? soulPalette[i % soulPalette.length] : firePalette[i % firePalette.length]
+    );
+  }
+  if (netherEmbers.instanceColor) netherEmbers.instanceColor.needsUpdate = true;
+  netherAmbientGroup.add(netherEmbers);
+
+  const NETHER_BRIDGE_SKELS = [
+    { x: 216.3, z0: 46.4, z1: 43.4, speed: 0.85, phase: 0.0 },
+    { x: 214.4, z0: 45.2, z1: 41.8, speed: 0.76, phase: 1.9 },
+    { x: 218.5, z0: 44.6, z1: 41.2, speed: 0.80, phase: 3.7 },
+  ];
+  let netherSkelsSpawned = false;
+  const netherBridgeSkels = [];
+
+  function ensureNetherBridgeSkels() {
+    if (netherSkelsSpawned || typeof ctx?.chars?.create !== 'function') return;
+    netherSkelsSpawned = true;
+    for (let i = 0; i < NETHER_BRIDGE_SKELS.length; i++) {
+      const r = NETHER_BRIDGE_SKELS[i];
+      const actor = ctx.chars.create('witherSkeleton', { id: `nether_amb_skel_${i}` });
+      if (!actor?.group) continue;
+      actor.setHelmet?.(true);
+      actor.group.position.set(r.x, 9, r.z0);
+      netherAmbientGroup.add(actor.group);
+      netherBridgeSkels.push({ actor, route: r, lastZ: r.z0 });
+    }
+  }
+
+  function updateNetherAmbient(simTime, dt) {
+    ensureNetherBridgeSkels();
+    if (currentArea !== 'nether') return;
+
+    for (let i = 0; i < NETHER_EMBER_COUNT; i++) {
+      const m = netherEmberSpecs[i];
+      const t = simTime * m.speed + m.phase;
+      const rise = (t * 0.85) % m.riseSpan;
+      const fade = 1 - (rise / m.riseSpan) * 0.45;
+      moteDummy.position.set(
+        m.x + Math.sin(t * 1.15) * 0.38,
+        m.yBase + rise,
+        m.z + Math.cos(t * 1.05) * 0.38
+      );
+      moteDummy.rotation.set(t * 1.1, t * 1.4, 0);
+      moteDummy.scale.setScalar(m.scale * fade * (0.8 + 0.25 * Math.sin(t * 3.1)));
+      moteDummy.updateMatrix();
+      netherEmbers.setMatrixAt(i, moteDummy.matrix);
+    }
+    netherEmbers.instanceMatrix.needsUpdate = true;
+
+    // Hide ambient bridge skeletons while Quest 9 (wither) is active so q_wither's 3 clickable skeletons take over!
+    const witherQuestActive =
+      ctx?.state?.quests?.wither?.status === 'active' ||
+      ctx?.quests?.activeId?.() === 'wither';
+    for (let i = 0; i < netherBridgeSkels.length; i++) {
+      const s = netherBridgeSkels[i];
+      s.actor.group.visible = !witherQuestActive;
+      if (witherQuestActive) continue;
+      const r = s.route;
+      const u = 0.5 - 0.5 * Math.cos(simTime * r.speed + r.phase);
+      const nz = r.z0 + (r.z1 - r.z0) * u;
+      s.actor.group.position.set(r.x, 9, nz);
+      const dz = nz - s.lastZ;
+      if (Math.abs(dz) > 1e-4) {
+        s.actor.group.rotation.y = dz > 0 ? 0 : Math.PI;
+        s.actor.setAnim?.('walk');
+      } else {
+        s.actor.setAnim?.('idle');
+      }
+      s.lastZ = nz;
+      s.actor.update?.(dt);
+    }
+  }
+
   function setArea(area) {
     currentArea = area === 'end' || area === 'nether' ? area : 'hub';
     chunkMgr.setArea(currentArea);
@@ -329,8 +493,11 @@ export function createWorld(ctx = {}) {
     portals.setArea(currentArea);
     boardWall.setArea(currentArea);
     endAmbientGroup.visible = currentArea === 'end';
+    netherAmbientGroup.visible = currentArea === 'nether';
     if (currentArea === 'end') {
       updateEndAmbient(localSimTime, 0);
+    } else if (currentArea === 'nether') {
+      updateNetherAmbient(localSimTime, 0);
     }
   }
 
@@ -408,6 +575,7 @@ export function createWorld(ctx = {}) {
     portals.update(dt);
     textures.update(localSimTime);
     updateEndAmbient(localSimTime, dt);
+    updateNetherAmbient(localSimTime, dt);
   }
 
   return {

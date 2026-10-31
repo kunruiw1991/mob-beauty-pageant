@@ -10,7 +10,7 @@ Used by tests/smoke.py and available to any test script:
     b.screenshot('/tmp/bv1xyn/shots/x.png')
 
 Chrome runs headless with an isolated throwaway profile under /tmp/bv1xyn and --no-proxy-server
-(corp policy otherwise routes http://127.0.0.1 through a proxy and the page never loads).
+(a system proxy would otherwise intercept http://127.0.0.1 and the page never loads).
 """
 import base64
 import functools

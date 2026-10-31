@@ -27,9 +27,19 @@ let shadowGeo = null;
 let jellyMat = null;
 let poofGeo = null;
 let poofMat = null;
+let faintStarGeo = null;
+let faintStarMat = null;
+let faintRingGeo = null;
+let faintRingMat = null;
+let witherFlashMat = null;
+let witherHaloGeo = null;
+let witherHaloMat = null;
 let nextActorUid = 1;
 const partGeoCache = new Map();
 const extraGeoCache = new Map();
+const _tmpStarVec = new THREE.Vector3();
+const _starEuler = new THREE.Euler();
+const _starMat4 = new THREE.Matrix4();
 
 export function getBlobShadowMesh(radius = 0.52) {
   if (!shadowMat) {
@@ -81,6 +91,92 @@ function createPoofRingMesh() {
   return m;
 }
 
+function makeColoredBox(w, h, d, hex, rz = 0) {
+  const g = new THREE.BoxGeometry(w, h, d);
+  if (rz) {
+    _starEuler.set(0, 0, rz, 'XYZ');
+    _starMat4.makeRotationFromEuler(_starEuler);
+    g.applyMatrix4(_starMat4);
+  }
+  const c = new THREE.Color(hex);
+  const cnt = g.attributes.position.count;
+  const arr = new Float32Array(cnt * 3);
+  for (let i = 0; i < cnt; i++) {
+    arr[i * 3] = c.r;
+    arr[i * 3 + 1] = c.g;
+    arr[i * 3 + 2] = c.b;
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(arr, 3));
+  return g;
+}
+
+function createKaiFaintStarsGroup() {
+  if (!faintStarGeo) {
+    faintStarGeo = mergeGeometries([
+      makeColoredBox(0.32, 0.32, 0.11, 0xffd43b, 0),
+      makeColoredBox(0.32, 0.32, 0.11, 0xffe066, Math.PI * 0.25),
+      makeColoredBox(0.16, 0.16, 0.15, 0xfff9db, 0),
+    ]);
+    faintStarMat = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false });
+    faintRingGeo = new THREE.TorusGeometry(0.68, 0.028, 6, 24);
+    faintRingGeo.rotateX(Math.PI / 2);
+    faintRingMat = new THREE.MeshBasicMaterial({
+      color: 0xffe066,
+      transparent: true,
+      opacity: 0.80,
+      toneMapped: false,
+    });
+  }
+  const root = new THREE.Group();
+  root.name = 'kaiFaintStars';
+  root.visible = false;
+  root.rotation.x = 0.24; // slight tilt toward camera so all 3 orbiting stars separate cleanly in 2D!
+  const spinner = new THREE.Group();
+  const ring = new THREE.Mesh(faintRingGeo, faintRingMat);
+  spinner.add(ring);
+  const starMeshes = [];
+  for (let i = 0; i < 3; i++) {
+    const ang = (i * Math.PI * 2) / 3;
+    const sm = new THREE.Mesh(faintStarGeo, faintStarMat);
+    sm.position.set(Math.cos(ang) * 0.68, 0, Math.sin(ang) * 0.68);
+    spinner.add(sm);
+    starMeshes.push(sm);
+  }
+  root.add(spinner);
+  root.userData.spinner = spinner;
+  root.userData.starMeshes = starMeshes;
+  return root;
+}
+
+function createWitherGlowHalo() {
+  if (!witherHaloGeo) {
+    const c = createCanvas(64, 64);
+    const g = c.getContext('2d');
+    if (g) {
+      const grad = g.createRadialGradient(32, 32, 3, 32, 32, 27);
+      grad.addColorStop(0, 'rgba(186,230,253,0.88)');
+      grad.addColorStop(0.45, 'rgba(56,189,248,0.52)');
+      grad.addColorStop(0.82, 'rgba(56,189,248,0.12)');
+      grad.addColorStop(1, 'rgba(56,189,248,0)');
+      g.fillStyle = grad;
+      g.fillRect(0, 0, 64, 64);
+    }
+    witherHaloMat = new THREE.MeshBasicMaterial({
+      map: canvasToTexture(c),
+      transparent: true,
+      opacity: 0.78,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      toneMapped: false,
+    });
+    witherHaloGeo = new THREE.PlaneGeometry(2.55, 2.55);
+  }
+  const m = new THREE.Mesh(witherHaloGeo, witherHaloMat);
+  m.position.set(0, 1.52, -0.34);
+  m.visible = false;
+  return m;
+}
+
 function paintStandardAtlas(g, spec) {
   g.clearRect(0, 0, 64, 64);
   g.fillStyle = spec.bodyColor || '#68b5ff';
@@ -125,7 +221,19 @@ function paintStandardAtlas(g, spec) {
 }
 
 export function buildChibiActor(kind, spec, opts = {}, ctx = null) {
-  const mat = getOrCreateSkinMaterial(`char_${kind}`, (g) => paintStandardAtlas(g, spec));
+  const baseMat = getOrCreateSkinMaterial(`char_${kind}`, (g) => paintStandardAtlas(g, spec));
+  let mat = baseMat;
+  if (kind === 'wither') {
+    if (!witherFlashMat) {
+      witherFlashMat = baseMat.clone();
+      witherFlashMat.emissive = new THREE.Color(0x000000);
+      witherFlashMat.emissiveMap = baseMat.map;
+      witherFlashMat.emissiveIntensity = 0;
+    }
+    if (!opts.lineup) {
+      mat = witherFlashMat;
+    }
+  }
 
   const group = new THREE.Group();
   group.name = `actor_${kind}`;
@@ -320,11 +428,12 @@ export function buildChibiActor(kind, spec, opts = {}, ctx = null) {
     parts.helmet = helmetMesh;
   }
 
-  // Toggleable slapstick gag props for rival 小凯 (cake face, snowman bury, 4-tier wobbling finale junk-hat tower!)
+  // Toggleable slapstick gag props for rival 小凯 (cake face, snowman bury, 4-tier wobbling finale junk-hat tower, faint stars!)
   let kaiCakeMesh = null;
   let kaiCakeExplicit = false;
   let kaiFinaleGroup = null;
   let kaiJunkTiers = null;
+  let kaiFaintStars = null;
   if (spec.hasKaiProps) {
     kaiCakeMesh = createAccessoryMesh('chefHat');
     kaiCakeMesh.scale.set(0.65, 0.55, 0.35);
@@ -387,6 +496,10 @@ export function buildChibiActor(kind, spec, opts = {}, ctx = null) {
     kaiJunkTiers = [tier1, tier2, tier3, tier4];
     kaiFinaleGroup.visible = !!opts.finale;
     head.add(kaiFinaleGroup);
+
+    kaiFaintStars = createKaiFaintStarsGroup();
+    group.add(kaiFaintStars);
+    parts.kaiFaintStars = kaiFaintStars;
   }
 
   const poofRing = createPoofRingMesh();
@@ -408,6 +521,9 @@ export function buildChibiActor(kind, spec, opts = {}, ctx = null) {
   neckAnchor.position.set(0, bodyH * 0.5, 0);
   body.add(neckAnchor);
 
+  let witherGlowHalo = null;
+  let sneezeKeyLight = null;
+  let sneezeFillLight = null;
   if (kind === 'wither') {
     const leftAnchor = new THREE.Group();
     leftAnchor.position.set(0.74, 0.70, 0.10);
@@ -418,6 +534,19 @@ export function buildChibiActor(kind, spec, opts = {}, ctx = null) {
     rightAnchor.scale.setScalar(0.50);
     body.add(rightAnchor);
     headAnchors.push(leftAnchor, rightAnchor);
+
+    witherGlowHalo = createWitherGlowHalo();
+    group.add(witherGlowHalo);
+    parts.witherGlowHalo = witherGlowHalo;
+
+    if (!opts.lineup) {
+      sneezeKeyLight = new THREE.PointLight(0xe0f2fe, 0, 14.0, 0.85);
+      sneezeKeyLight.position.set(0.20, 2.05, 2.15);
+      group.add(sneezeKeyLight);
+      sneezeFillLight = new THREE.PointLight(0xbae6fd, 0, 10.0, 1.0);
+      sneezeFillLight.position.set(-1.10, 2.10, 1.45);
+      group.add(sneezeFillLight);
+    }
   }
 
   const shadow = getBlobShadowMesh(spec.shadowRadius ?? 0.52);
@@ -455,15 +584,70 @@ export function buildChibiActor(kind, spec, opts = {}, ctx = null) {
     phase: (nextActorUid * 1.618) % (Math.PI * 2),
     hitRadius: kind === 'slimeMob' ? 0.55 * ((opts.size || 1) === 2 ? 1.35 : 0.72) : (spec.hitRadius ?? 0.65),
     _lastFrame: -1,
+    _faintCutSynced: false,
+    _faintInGagCam: false,
+    _faintSpringAt: 0.96,
+    _sneezeFlashOn: false,
+    _sneezeFlashTimer: 0,
+    _sneezeBurstTimer: 0,
 
     setAnim(name) {
       const next = name || 'idle';
       if (actor.anim !== next) {
         actor.anim = next;
         actor.animTime = 0;
+        if (next === 'faint') {
+          actor._faintCutSynced = false;
+          actor._faintInGagCam = false;
+          actor._faintSpringAt = 0.96;
+        } else if (next === 'sneeze' && kind === 'wither') {
+          actor._sneezeFlashTimer = Math.max(actor._sneezeFlashTimer, 3.4);
+          actor._sneezeBurstTimer = 0.55;
+        }
       }
       if (kaiCakeMesh && !kaiCakeExplicit) {
         kaiCakeMesh.visible = !actor.finaleActive && next === 'eat';
+      }
+    },
+
+    setSneezeFlash(active = true) {
+      const on = !!active;
+      actor._sneezeFlashOn = on;
+      if (on) {
+        actor._sneezeFlashTimer = Math.max(actor._sneezeFlashTimer, 3.4);
+        actor._sneezeBurstTimer = 0.55;
+      } else {
+        actor._sneezeFlashTimer = 0;
+        actor._sneezeBurstTimer = 0;
+      }
+    },
+
+    _syncKaiFaintStars() {
+      if (!kaiFaintStars) return;
+      const show = (actor.anim === 'faint' || actor.anim === 'dizzy') && !actor.finaleActive;
+      kaiFaintStars.visible = show;
+      if (!show) return;
+      head.updateWorldMatrix(true, false);
+      group.updateWorldMatrix(true, false);
+      _tmpStarVec.set(0, headS * 0.5, 0);
+      head.localToWorld(_tmpStarVec);
+      group.worldToLocal(_tmpStarVec);
+      kaiFaintStars.position.set(_tmpStarVec.x, Math.max(1.22, _tmpStarVec.y + 0.76), _tmpStarVec.z);
+      const spinner = kaiFaintStars.userData.spinner;
+      const starMeshes = kaiFaintStars.userData.starMeshes;
+      const spinT = actor.animTime * 5.8 + 0.62;
+      if (spinner) spinner.rotation.y = spinT;
+      if (starMeshes) {
+        for (let i = 0; i < starMeshes.length; i++) {
+          starMeshes[i].position.y = Math.sin(spinT * 1.4 + i * 2.09) * 0.06;
+          starMeshes[i].rotation.y = -spinT + i * 1.1;
+          starMeshes[i].rotation.z = Math.sin(spinT * 2.0 + i) * 0.22;
+        }
+      }
+      for (const hc of head.children) {
+        if (hc !== kaiFinaleGroup && hc !== mainAnchor && hc !== faceAnchor && hc.isGroup && hc.position.y > 1.15) {
+          hc.visible = false;
+        }
       }
     },
 
@@ -651,7 +835,80 @@ export function buildChibiActor(kind, spec, opts = {}, ctx = null) {
         }
       }
 
-      applyActorAnim(actor, dt);
+      // Sync 小凯 faint timeline to the exact frame Gag-Cam cuts onto him (when queued behind emerald_eyes, #183 R1)
+      let animDt = dt;
+      if (kind === 'kai' && actor.anim === 'faint' && !actor.finaleActive) {
+        const gagActive = !!ctx?.state?.gagCam?.active;
+        if (!actor._faintCutSynced) {
+          if (gagActive) {
+            const ct = ctx?.cam?.target;
+            const nearKai = ct ? Math.hypot(ct.x - group.position.x, ct.z - group.position.z) < 4.5 : true;
+            if (!nearKai) {
+              actor.animTime = 0;
+              animDt = 0;
+            } else {
+              actor._faintCutSynced = true;
+              actor._faintInGagCam = true;
+              actor.animTime = 0;
+              actor._faintSpringAt = 1.45;
+              animDt = 0;
+            }
+          } else {
+            actor._faintCutSynced = true;
+            actor._faintInGagCam = false;
+            actor._faintSpringAt = 0.96;
+          }
+        } else if (actor._faintInGagCam && !gagActive) {
+          actor._faintInGagCam = false;
+          actor._faintSpringAt = Math.min(actor._faintSpringAt, Math.max(0.45, actor.animTime));
+        }
+      }
+
+      applyActorAnim(actor, animDt);
+
+      if (kind === 'kai' && actor.anim === 'faint' && actor._faintCutSynced && actor.animTime >= actor._faintSpringAt + 0.25) {
+        actor.animTime -= actor._faintSpringAt + 0.25;
+        actor.anim = 'dizzy';
+      }
+
+      if (kaiFaintStars) {
+        actor._syncKaiFaintStars();
+      }
+
+      // #183 R2: Emissive soul-cyan flash + front key/fill lighting + rim halo on 三三 (wither) in Nether summon!
+      if (kind === 'wither' && !opts.lineup) {
+        if (actor._sneezeFlashTimer > 0) actor._sneezeFlashTimer = Math.max(0, actor._sneezeFlashTimer - dt);
+        if (actor._sneezeBurstTimer > 0) actor._sneezeBurstTimer = Math.max(0, actor._sneezeBurstTimer - dt);
+        const inWorld = !ctx?.state?.scene || ctx.state.scene === 'world';
+        const spawningGlow = inWorld && ctx?.state?.area === 'nether' && actor.anim === 'spawn';
+        const flashActive = inWorld && (actor._sneezeFlashOn || actor._sneezeFlashTimer > 0 || actor.anim === 'sneeze');
+        if (flashActive && witherFlashMat) {
+          const burst = actor._sneezeBurstTimer > 0 ? (actor._sneezeBurstTimer / 0.55) : 0;
+          const pulse = 0.38 + Math.sin(actor.animTime * 10.0) * 0.05 + burst * 0.36;
+          witherFlashMat.emissive.setHex(0xbae6fd);
+          witherFlashMat.emissiveIntensity = pulse;
+          if (sneezeKeyLight) sneezeKeyLight.intensity = 4.5 + burst * 1.8;
+          if (sneezeFillLight) sneezeFillLight.intensity = 2.6 + burst * 1.0;
+          if (witherGlowHalo) {
+            witherGlowHalo.visible = true;
+            const hs = 1.0 + burst * 0.22 + Math.sin(actor.animTime * 8.0) * 0.04;
+            witherGlowHalo.scale.set(hs, hs, 1);
+          }
+        } else if (spawningGlow && witherFlashMat) {
+          witherFlashMat.emissive.setHex(0x93c5fd);
+          witherFlashMat.emissiveIntensity = 0.35;
+          if (sneezeKeyLight) sneezeKeyLight.intensity = 2.8;
+          if (sneezeFillLight) sneezeFillLight.intensity = 1.6;
+          if (witherGlowHalo) witherGlowHalo.visible = false;
+        } else {
+          if (witherFlashMat && actor.group.parent) {
+            witherFlashMat.emissiveIntensity = 0;
+          }
+          if (sneezeKeyLight) sneezeKeyLight.intensity = 0;
+          if (sneezeFillLight) sneezeFillLight.intensity = 0;
+          if (witherGlowHalo) witherGlowHalo.visible = false;
+        }
+      }
 
       // Cascading 4-tier spring/pendulum wobble on 小凯's finale junk-hat tower (#155 C2)
       if (kaiFinaleGroup && kaiFinaleGroup.visible && kaiJunkTiers) {
@@ -672,8 +929,16 @@ export function buildChibiActor(kind, spec, opts = {}, ctx = null) {
       if (spec.onUpdate) spec.onUpdate(actor, dt);
 
       if (emoteSprite) {
-        const extraH = kaiFinaleGroup && kaiFinaleGroup.visible ? 1.25 : 0;
-        emoteSprite.position.y = topHeight + extraH + 0.65 + Math.sin(actor.animTime * 5) * 0.06;
+        if (kaiFaintStars && kaiFaintStars.visible) {
+          emoteSprite.position.set(
+            kaiFaintStars.position.x,
+            kaiFaintStars.position.y + 0.62 + Math.sin(actor.animTime * 5) * 0.05,
+            kaiFaintStars.position.z
+          );
+        } else {
+          const extraH = kaiFinaleGroup && kaiFinaleGroup.visible ? 1.25 : 0;
+          emoteSprite.position.set(0, topHeight + extraH + 0.65 + Math.sin(actor.animTime * 5) * 0.06, 0);
+        }
       }
       const lift = Math.max(0, rig.position.y);
       const sScale = Math.max(0.35, 1 - lift * 0.42) * (spec.shadowRadius ?? 0.52) * 2;
@@ -720,6 +985,12 @@ export function createChars(ctx = {}) {
         for (const a of actors) {
           if (a.kind === 'kai') a.setCakeFace(true);
         }
+      } else if (gagId === 'sneeze_balloon' || gagId === 'wither_sneeze_balloon') {
+        for (const a of actors) {
+          if (a.kind === 'wither' && a.group.parent && a.group.visible) {
+            a.setSneezeFlash(true);
+          }
+        }
       }
     });
   }
@@ -733,12 +1004,12 @@ export function createChars(ctx = {}) {
     createAccessoryMesh,
     update(dt) {
       capes.update(dt);
+      const camPos = ctx?.camera?.position || ctx?.cam?.camera?.position;
       for (const a of actors) {
         if (a.group.parent && a.group.visible) {
           a.update(dt);
           // Runs after rival.update(dt): keep 小凯 facing camera & speech bubble cleanly above the 4-tier wobbling hat stack!
           if (a.kind === 'kai' && (a.finaleActive || ctx?.state?.scene === 'finale')) {
-            const camPos = ctx?.camera?.position || ctx?.cam?.camera?.position;
             if (camPos) {
               const cdx = camPos.x - a.group.position.x;
               const cdz = camPos.z - a.group.position.z;
@@ -747,7 +1018,7 @@ export function createChars(ctx = {}) {
               a.group.rotation.y = 0;
             }
             for (const ch of a.group.children) {
-              if (ch === a.rig || ch === a.parts?.shadow || ch === a.parts?.poofRing) continue;
+              if (ch === a.rig || ch === a.parts?.shadow || ch === a.parts?.poofRing || ch === a.parts?.kaiFaintStars) continue;
               if (ch.isSprite && ch.visible && ch !== a._getEmoteSprite?.()) {
                 ch.position.y = 3.98 + Math.sin(a.animTime * 5.5) * 0.07;
               } else if (ch.isGroup && ch.visible) {
@@ -757,6 +1028,26 @@ export function createChars(ctx = {}) {
                   }
                 }
               }
+            }
+          } else if (a.kind === 'kai' && (a.anim === 'faint' || a.anim === 'dizzy') && !a.finaleActive) {
+            // Re-assert exact faint/twitch/spring-up/dizzy pose after rival.update(dt) (#183 R1)
+            applyActorAnim(a, 0);
+            a._syncKaiFaintStars?.();
+          } else if (
+            a.kind === 'wither' &&
+            ctx?.state?.scene === 'world' &&
+            (a._sneezeFlashOn || a._sneezeFlashTimer > 0 || a.anim === 'sneeze')
+          ) {
+            // Orient 三三's face & 3 heads directly toward active focus camera during sneeze_balloon (#183 R2)
+            if (camPos && ctx?.cam?.mode === 'focus') {
+              const cdx = camPos.x - a.group.position.x;
+              const cdz = camPos.z - a.group.position.z;
+              if (cdx * cdx + cdz * cdz > 1e-4) {
+                a.group.rotation.y = Math.atan2(cdx, cdz);
+              }
+            }
+            if (a.parts?.head && a.anim !== 'sneeze') {
+              a.parts.head.rotation.x = -0.10;
             }
           }
         }

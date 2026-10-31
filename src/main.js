@@ -324,6 +324,7 @@ async function boot() {
     kai_cake_face: '🎂😵',
     wither_three_hats: '🎩👑',
     skeleton_bald: '💀😳',
+    sneeze_balloon: '🎈🤧',
     emerald_eyes: '💎🤩',
     kai_faint: '💫😵',
     egg_hop: '🥚💨',
@@ -407,6 +408,9 @@ async function boot() {
 
   const gagQueue = [];
   const gagTempBox = new THREE.Box3();
+  const gagPropRaycaster = new THREE.Raycaster();
+  const gagRayOrigin = new THREE.Vector3();
+  const gagRayDir = new THREE.Vector3();
   let gagCamRemaining = 0;
   let gagCamDuration = 1.4;
   let gagCamElapsed = 0;
@@ -415,42 +419,169 @@ async function boot() {
   let gagSubjectGroup = null;
   let gagCharHeight = 2.2;
 
-  function pickClearGagYaw(focusPos, dist = 5.8, height = 2.65) {
-    const baseYaw = ctx.cam?.yaw ?? 0;
-    const offsets = [0, 0.55, -0.55, 1.15, -1.15, 1.85, -1.85, Math.PI];
-    let bestYaw = baseYaw;
-    let bestClear = -1;
+  function evaluatePlayerSightline(candYaw, focusPos, dist) {
+    const px = ctx.player?.pos?.x;
+    const pz = ctx.player?.pos?.z;
+    if (!Number.isFinite(px) || !Number.isFinite(pz)) {
+      return { occluded: false, hardOccluded: false, playerDistXZ: 99, dPerp: 99, signedRight: -2 };
+    }
+    const playerDistXZ = Math.hypot(px - focusPos.x, pz - focusPos.z);
+    const cx = focusPos.x + Math.sin(candYaw) * dist;
+    const cz = focusPos.z + Math.cos(candYaw) * dist;
+    const vx = focusPos.x - cx;
+    const vz = focusPos.z - cz;
+    const len2 = vx * vx + vz * vz || 1;
+    // t along camera(0) -> subject(1)
+    const t = ((px - cx) * vx + (pz - cz) * vz) / len2;
+    // Camera-right unit vector in XZ is (cos(yaw), -sin(yaw))
+    const signedRight =
+      (px - focusPos.x) * Math.cos(candYaw) - (pz - focusPos.z) * Math.sin(candYaw);
+    const dPerp = Math.abs(signedRight);
+    const betweenCamAndSubject = t > 0.06 && t < 1.06;
+    const noseToNose = playerDistXZ < 1.45;
+    return {
+      occluded: betweenCamAndSubject && dPerp < 1.45,
+      hardOccluded: noseToNose || (betweenCamAndSubject && dPerp < 1.28),
+      playerDistXZ,
+      dPerp,
+      signedRight,
+      t,
+    };
+  }
+
+  function pickClearGagYaw(focusPos, dist = 7.1, height = 2.25, subjectGroup = null) {
+    const camYaw = ctx.cam?.yaw ?? 0;
+    const hasSubjectYaw = Boolean(subjectGroup && Number.isFinite(subjectGroup.rotation?.y));
+    const refYaw = hasSubjectYaw ? subjectGroup.rotation.y : camYaw;
+
+    // 16 candidate angles around the subject (including crisp ±45° / ±65° 3/4 front shots)
+    const offsets = [
+      0,
+      0.78,
+      -0.78,
+      1.12,
+      -1.12,
+      0.48,
+      -0.48,
+      1.48,
+      -1.48,
+      1.88,
+      -1.88,
+      2.35,
+      -2.35,
+      Math.PI,
+    ];
+
+    // Collect large opaque quest prop meshes once per Gag-Cam cut (e.g. stall boards/walls)
+    const propOccluders = [];
+    if (ctx.scene?.children) {
+      for (const ch of ctx.scene.children) {
+        if (
+          !ch ||
+          !ch.visible ||
+          ch === ctx.world?.group ||
+          ch === ctx.player?.group ||
+          ch === gagBubbleSprite ||
+          ch.userData?._actorKind
+        ) {
+          continue;
+        }
+        ch.traverse?.((node) => {
+          if (
+            node?.visible &&
+            node.isMesh &&
+            !node.isInstancedMesh &&
+            node.geometry &&
+            node.material &&
+            !node.material.transparent
+          ) {
+            if (!node.geometry.boundingBox) node.geometry.computeBoundingBox();
+            const bb = node.geometry.boundingBox;
+            if (bb) {
+              const span = Math.max(bb.max.x - bb.min.x, bb.max.y - bb.min.y, bb.max.z - bb.min.z);
+              if (span >= 1.1) propOccluders.push(node);
+            }
+          }
+        });
+      }
+    }
+
+    let bestYaw = camYaw;
+    let bestScore = -Infinity;
 
     for (const off of offsets) {
-      let cand = baseYaw + off;
+      let cand = refYaw + off;
       while (cand > Math.PI) cand -= Math.PI * 2;
       while (cand < -Math.PI) cand += Math.PI * 2;
 
-      if (typeof ctx.world?.raycast !== 'function') {
-        return cand;
-      }
       const cx = focusPos.x + Math.sin(cand) * dist;
       const cy = focusPos.y + height;
       const cz = focusPos.z + Math.cos(cand) * dist;
+
+      let score = 0;
       const dx = focusPos.x - cx;
       const dy = focusPos.y - cy;
       const dz = focusPos.z - cz;
       const len = Math.hypot(dx, dy, dz) || 1;
-      const hit = ctx.world.raycast(
-        { x: cx, y: cy, z: cz },
-        { x: dx / len, y: dy / len, z: dz / len },
-        Math.max(0.5, len - 0.85)
-      );
-      if (!hit) {
-        return cand;
+
+      // 1. World block + large prop-board line-of-sight check
+      let worldBlocked = false;
+      if (typeof ctx.world?.raycast === 'function') {
+        const hit = ctx.world.raycast(
+          { x: cx, y: cy, z: cz },
+          { x: dx / len, y: dy / len, z: dz / len },
+          Math.max(0.5, len - 0.85)
+        );
+        if (hit) {
+          worldBlocked = true;
+          const hitDist = Math.hypot(
+            hit.pos.x + 0.5 - cx,
+            hit.pos.y + 0.5 - cy,
+            hit.pos.z + 0.5 - cz
+          );
+          score -= 1000 - hitDist * 40;
+        }
       }
-      const hitDist = Math.hypot(
-        hit.pos.x + 0.5 - cx,
-        hit.pos.y + 0.5 - cy,
-        hit.pos.z + 0.5 - cz
-      );
-      if (hitDist > bestClear) {
-        bestClear = hitDist;
+      if (!worldBlocked && propOccluders.length > 0) {
+        gagRayOrigin.set(cx, cy, cz);
+        gagRayDir.set(dx / len, dy / len, dz / len);
+        gagPropRaycaster.near = 0.2;
+        gagPropRaycaster.far = Math.max(0.5, len - 0.55);
+        gagPropRaycaster.set(gagRayOrigin, gagRayDir);
+        const propHits = gagPropRaycaster.intersectObjects(propOccluders, false);
+        if (propHits.length > 0) {
+          worldBlocked = true;
+          score -= 750;
+        }
+      }
+      if (!worldBlocked) {
+        score += 100;
+      }
+
+      // 2. Avoid player chibi head blocking camera -> subject sightline (#175).
+      // If player is nose-to-nose (< 1.45b), player is temporarily hidden during the 1.4s close-up
+      // so we keep the clean front shot instead of spinning 180° behind the subject's backdrop!
+      const pCheck = evaluatePlayerSightline(cand, focusPos, dist);
+      if (pCheck.playerDistXZ >= 1.45) {
+        if (pCheck.occluded) {
+          score -= 420 * (1.55 - pCheck.dPerp);
+        } else {
+          score += 40;
+          // Prefer player on camera-LEFT (< 0) so camera-RIGHT emote bubble stays 100% clear
+          if (pCheck.signedRight < -0.35) {
+            score += 12;
+          }
+        }
+      }
+
+      // 3. Prefer seeing the gag subject's front / 3/4 face + mild continuity with current camYaw
+      if (hasSubjectYaw) {
+        score += Math.cos(cand - subjectGroup.rotation.y) * 26;
+      }
+      score += Math.cos(cand - camYaw) * 8;
+
+      if (score > bestScore) {
+        bestScore = score;
         bestYaw = cand;
       }
     }
@@ -494,10 +625,12 @@ async function boot() {
       : gid === 'fake_iron'
         ? 'bela'
         : gid === 'emerald_eyes'
-          ? 'cuicui'
-          : gid === 'skeleton_bald'
-            ? 'skeletonMob'
-            : questId || null;
+          ? 'villager'
+          : gid === 'snow_head_pop'
+            ? 'snowGolemMob'
+            : gid === 'skeleton_bald'
+              ? 'witherSkeleton'
+              : questId || null;
 
     let bestPreferred = null;
     let bestPrefDist = Infinity;
@@ -518,7 +651,11 @@ async function boot() {
       if (!kind) continue;
       const d = Math.hypot(ch.position.x - worldPos.x, ch.position.z - worldPos.z);
       if (d > 9.0) continue;
-      if (preferredKind && kind === preferredKind && d < bestPrefDist) {
+      if (
+        preferredKind &&
+        (kind === preferredKind || (preferredKind === 'witherSkeleton' && kind === 'skeletonMob')) &&
+        d < bestPrefDist
+      ) {
         bestPrefDist = d;
         bestPreferred = ch;
       }
@@ -611,8 +748,21 @@ async function boot() {
     state.gagCam.active = true;
 
     const f = computeGagFramingFromSubject();
-    const clearYaw = pickClearGagYaw(f.focusTarget, f.dist, f.height);
+    const clearYaw = pickClearGagYaw(f.focusTarget, f.dist, f.height, gagSubjectGroup);
     gagCamYaw = clearYaw;
+    if (
+      gagSubjectGroup &&
+      gagId !== 'skeleton_bald' &&
+      gagId !== 'fake_iron' &&
+      Number.isFinite(gagSubjectGroup.rotation?.y) &&
+      Math.cos(clearYaw - gagSubjectGroup.rotation.y) < 0.55
+    ) {
+      gagSubjectGroup.rotation.y = clearYaw - 0.25;
+    }
+    if (ctx.player?.group && state.scene === 'world') {
+      const pSight = evaluatePlayerSightline(clearYaw, f.focusTarget, f.dist);
+      ctx.player.group.visible = !pSight.hardOccluded;
+    }
     ctx.cam.focus(f.focusTarget, {
       distance: f.dist,
       height: f.height,
@@ -637,6 +787,9 @@ async function boot() {
       state.gagCam.active = false;
     }
     gagBubbleSprite.visible = false;
+    if (state.scene === 'world' && ctx.player?.group) {
+      ctx.player.group.visible = true;
+    }
     if (restoreFollow && state.scene === 'world') {
       ctx.cam.clearFocus();
     }
@@ -1516,6 +1669,13 @@ async function boot() {
           gagCamRemaining -= dt;
           gagCamElapsed += dt;
           const f = computeGagFramingFromSubject();
+          if (ctx.player?.group) {
+            ctx.player.group.visible = !evaluatePlayerSightline(
+              gagCamYaw,
+              f.focusTarget,
+              f.dist
+            ).hardOccluded;
+          }
           ctx.cam.updateFocusTarget?.(f.focusTarget, { distance: f.dist, height: f.height });
           updateGagBubbleTransform(f);
           if (gagCamRemaining <= 0) {

@@ -162,11 +162,11 @@ INSTALL_SIM_HARNESS_JS = r"""
     }
   };
 
-  const walkUntilSettled = async (P, targetPos, questId, tracker, maxExtraFrames = 240, targetId = null, policy = 'ideal') => {
+  const walkUntilSettled = async (P, targetPos, questId, tracker, maxExtraFrames = 240, targetId = null, policy = 'ideal', allowLongCruise = true) => {
     let s = P.getState();
     const d = dist2D(s.player, targetPos);
     const estSpeed = questId === 'cat' ? 1.5 : 3.8;
-    const budget = d > 6 ? Math.min(1200, Math.ceil((d / estSpeed) * 60) + 90) : maxExtraFrames;
+    const budget = (allowLongCruise && d > 6) ? Math.min(1200, Math.ceil((d / estSpeed) * 60) + 90) : maxExtraFrames;
     const startStep = s.quest ? s.quest.step : null;
     const startProg = s.quest ? s.quest.progress : null;
     let spent = 0;
@@ -345,16 +345,19 @@ INSTALL_SIM_HARNESS_JS = r"""
       const s = P.getState();
       if (s.scene === 'booth') {
         if (policy === 'random') {
-          // Kid tries 1-2 accessories and admires runway walk (~7-11 s).
-          const browseFrames = 420 + Math.floor(rng() * 240);
-          P.stepFrames(Math.floor(browseFrames * 0.5));
+          // Kid tries 2 accessories and admires runway walk (~9.5-12.5 s, §8.1).
+          const browseFrames = 570 + Math.floor(rng() * 180);
+          P.stepFrames(Math.floor(browseFrames * 0.35));
           await flushMicro();
           const cId = Object.keys(s.contestants || {}).find(
             (k) => s.quests && s.quests[k] && s.quests[k].status === 'done' && !(s.board && s.board[k])
           ) || 'sheep';
           const metaAccs = (window.__ROSTER_ACCS__ && window.__ROSTER_ACCS__[cId]) || ['crown', 'flowerCrown', 'bow'];
           await P.boothChoose(metaAccs[Math.floor(rng() * metaAccs.length)]);
-          P.stepFrames(Math.ceil(browseFrames * 0.5));
+          P.stepFrames(Math.floor(browseFrames * 0.35));
+          await flushMicro();
+          await P.boothChoose(metaAccs[(Math.floor(rng() * metaAccs.length) + 1) % metaAccs.length]);
+          P.stepFrames(Math.ceil(browseFrames * 0.30));
           await flushMicro();
         } else {
           P.stepFrames(30);
@@ -387,7 +390,7 @@ INSTALL_SIM_HARNESS_JS = r"""
         }
 
         if (policy === 'random') {
-          await stepAsync(P, 300 + Math.floor(rng() * 240), 30); // ~5-9s board deliberation
+          await stepAsync(P, 390 + Math.floor(rng() * 270), 30); // ~6.5-11s board deliberation + "?" hint peek
         } else {
           await stepAsync(P, 15, 15);
         }
@@ -497,9 +500,78 @@ INSTALL_SIM_HARNESS_JS = r"""
         chosen = actionable[Math.floor(rng() * actionable.length)];
       }
 
+      // After quest 5 (#172 Q3 "?" hints), random-ish player naturally explores H2 pinksheep & H1 dragon!
+      if (
+        policy === 'random' &&
+        !activeQ &&
+        rankedMain >= 5 &&
+        !(s.contestants && s.contestants.pinksheep && s.contestants.pinksheep.found) &&
+        s.area === 'hub' &&
+        window.__CTX__ &&
+        window.__CTX__.quests
+      ) {
+        const tp = (window.__CTX__.world && window.__CTX__.world.poi && window.__CTX__.world.poi.pinkTulip) || { x: 33.5, y: 8, z: 72.5 };
+        if (dist2D(s.player, tp) > 2.2) {
+          if (window.__CTX__.player && typeof window.__CTX__.player.walkTo === 'function') {
+            window.__CTX__.player.walkTo(tp, { maxSearchR: 4 });
+          }
+          await walkUntilSettled(P, tp, null, tracker, 96, null, 'random', false);
+          await stepAndSample(P, 18 + Math.floor(rng() * 55), null, tracker);
+          continue;
+        } else {
+          window.__CTX__.quests.onTap({ kind: 'block', pos: tp, fromAgent: true });
+          await flushMicro();
+          await stepAndSample(P, 24, 'pinksheep', tracker);
+          continue;
+        }
+      }
+      if (
+        policy === 'random' &&
+        !activeQ &&
+        rankedMain >= 6 &&
+        !(s.contestants && s.contestants.dragon && s.contestants.dragon.found) &&
+        window.__CTX__ &&
+        window.__CTX__.quests
+      ) {
+        if (s.area === 'hub') {
+          const ep = (window.__CTX__.world && window.__CTX__.world.poi && window.__CTX__.world.poi.endPortal) || { x: 20.5, y: 8, z: 18.5 };
+          if (window.__CTX__.player && typeof window.__CTX__.player.walkTo === 'function') {
+            window.__CTX__.player.walkTo({ x: ep.x, y: 8, z: ep.z }, { maxSearchR: 4 });
+          }
+          await walkUntilSettled(P, ep, null, tracker, 96, null, 'random', false);
+          await stepAndSample(P, 18 + Math.floor(rng() * 55), null, tracker);
+          continue;
+        } else if (s.area === 'end') {
+          const eggStand = { x: 153.2, y: 17, z: 26.5 };
+          const eggHit = { x: 152.5, y: 17, z: 26.5 };
+          if (dist2D(s.player, eggStand) > 2.2 || Math.abs((s.player.y || 8) - 17) > 2.5) {
+            if (window.__CTX__.player && typeof window.__CTX__.player.walkTo === 'function') {
+              window.__CTX__.player.walkTo(eggStand, { maxSearchR: 4 });
+            }
+            await walkUntilSettled(P, eggStand, null, tracker, 96, null, 'random', false);
+            await stepAndSample(P, 18 + Math.floor(rng() * 55), null, tracker);
+            continue;
+          } else {
+            window.__CTX__.quests.onTap({ kind: 'entity', pos: eggHit, fromAgent: true });
+            await flushMicro();
+            await stepAndSample(P, 24, 'dragon', tracker);
+            continue;
+          }
+        }
+      }
+
       await P.tapTarget(chosen.id);
       await flushMicro();
-      await walkUntilSettled(P, chosen.pos, activeQ, tracker, policy === 'ideal' ? 300 : 180, chosen.id, policy);
+      await walkUntilSettled(
+        P,
+        chosen.pos,
+        activeQ,
+        tracker,
+        policy === 'ideal' ? 300 : 96,
+        chosen.id,
+        policy,
+        policy === 'ideal'
+      );
       if (policy === 'ideal') {
         // #143 binding rule 1: ideal agent waits 0.45 s (27 frames @ 60 Hz) between taps (reaction).
         await stepAndSample(P, 27, activeQ, tracker);
@@ -1576,11 +1648,14 @@ def run_sim_gates_on_session(
       'diagnostics': diag,
   }
 
-  os.makedirs(os.path.dirname(GATES_JSON_PATH), exist_ok=True)
-  with open(GATES_JSON_PATH, 'w', encoding='utf-8') as f:
+  is_partial = bool(quick or gate_filter)
+  json_out = os.path.join(os.path.dirname(GATES_JSON_PATH), 'gates_quick.json') if is_partial else GATES_JSON_PATH
+  md_out = os.path.join(os.path.dirname(GATES_MD_PATH), 'gates_quick.md') if is_partial else GATES_MD_PATH
+  os.makedirs(os.path.dirname(json_out), exist_ok=True)
+  with open(json_out, 'w', encoding='utf-8') as f:
     json.dump(report, f, ensure_ascii=False, indent=2)
   md = format_gates_markdown(report)
-  with open(GATES_MD_PATH, 'w', encoding='utf-8') as f:
+  with open(md_out, 'w', encoding='utf-8') as f:
     f.write(md + '\n')
   return report
 

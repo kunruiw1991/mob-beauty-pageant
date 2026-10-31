@@ -181,6 +181,7 @@ export function createRival(ctx) {
   let eatTimer = 0;
   let eatCrumbAccum = 0;
   let resumePatrolAfterEat = false;
+  const faintBasePos = { x: 83.6, y: 8, z: 30.5 };
 
   // Pooled scene groups & slapstick props (created once, reused forever)
   const fxRoot = new THREE.Group();
@@ -432,7 +433,7 @@ export function createRival(ctx) {
       clearSlapstickProps();
       currentMode = mode || 'cameo';
       modeTime = 0;
-      popInTimer = 0.24;
+      popInTimer = mode === 'fainted' ? 0 : 0.24;
       fxRoot.visible = true;
       if (targetPos) {
         setWorldPos(targetPos);
@@ -680,7 +681,12 @@ export function createRival(ctx) {
         modeTime = 0;
         recordAppearance(questId);
       }
-      starsGroup.visible = true;
+      faintBasePos.x = pos.x;
+      faintBasePos.y = pos.y;
+      faintBasePos.z = pos.z;
+      // Only show fallback head-attached stars if buildFallbackKaiActor is in use;
+      // real kai actor renders 3 horizontal orbiting stars on actor.group (#183 R1 / #184).
+      starsGroup.visible = !actor?.parts?.legL;
       actor?.setAnim?.('faint');
       actor?.setEmote?.('💫');
       playSfx(ctx, 'boing', { pos });
@@ -821,12 +827,22 @@ export function createRival(ctx) {
         snowmanGroup.rotation.z = Math.sin(modeTime * 24) * 0.06;
         actor.rig.position.x = Math.sin(modeTime * 28) * 0.04;
       } else if (currentMode === 'fainted') {
-        starsGroup.rotation.y = modeTime * 4.8;
-        if (actor.rig) {
-          // Ensure dramatic flat-on-back flop even if base anim is gentle
-          const flop = Math.min(1, modeTime * 5.0);
-          actor.rig.rotation.x = -flop * (Math.PI * 0.46);
-          actor.rig.position.y = flop * 0.22;
+        if (starsGroup.visible) {
+          starsGroup.rotation.y = modeTime * 4.8;
+          if (actor.rig) {
+            const flop = Math.min(1, modeTime * 5.0);
+            actor.rig.rotation.x = -flop * (Math.PI * 0.46);
+            actor.rig.position.y = flop * 0.22;
+          }
+        } else if (actor.anim === 'dizzy' && actor.group) {
+          // Staggering dizzy-walk loop after springing up (#183 R1)
+          const wobAngle = modeTime * 4.2;
+          pos.set(
+            faintBasePos.x + Math.sin(wobAngle) * 0.34,
+            faintBasePos.y,
+            faintBasePos.z + Math.sin(wobAngle * 2.0) * 0.24
+          );
+          actor.group.position.copy(pos);
         }
       } else if (currentMode === 'hog' && actor.rig) {
         actor.rig.position.y = Math.abs(Math.sin(modeTime * 8.5)) * 0.22;

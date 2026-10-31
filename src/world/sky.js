@@ -32,17 +32,17 @@ const PALETTES = {
     stars: true,
   },
   nether: {
-    bg: 0x45100e,
-    zenith: [0x2a0706, 0x5c1512, 0x8f2618],
-    fogColor: 0x571612,
-    fogNear: 32,
-    fogFar: 92,
-    hemiSky: 0xff9f6e,
-    hemiGround: 0x4f1a18,
-    hemiInt: 0.9,
-    dirColor: 0xffc078,
-    dirInt: 1.0,
-    dirPos: [200, 54, 72],
+    bg: 0x4a110e,
+    zenith: [0x240606, 0x5c1512, 0x9c2c1a],
+    fogColor: 0x591712,
+    fogNear: 38,
+    fogFar: 106,
+    hemiSky: 0xffb48a,
+    hemiGround: 0x5c221d,
+    hemiInt: 0.94,
+    dirColor: 0xffd494,
+    dirInt: 1.04,
+    dirPos: [210, 58, 76],
     clouds: false,
     stars: false,
   },
@@ -108,6 +108,46 @@ function makeStarSkyTexture() {
   return tex;
 }
 
+function makeNetherSkyTexture() {
+  const c = document.createElement('canvas');
+  c.width = 512;
+  c.height = 256;
+  const g = c.getContext('2d');
+  const grad = g.createLinearGradient(0, 0, 0, 256);
+  grad.addColorStop(0.0, '#1f0505');
+  grad.addColorStop(0.35, '#470f0d');
+  grad.addColorStop(0.68, '#7a1f16');
+  grad.addColorStop(0.88, '#a6341b');
+  grad.addColorStop(1.0, '#591610');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 512, 256);
+  let s = 0x7f4a2c19;
+  const rnd = () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+  // Cavernous crimson ridges & distant warm lava horizon haze
+  for (let i = 0; i < 48; i++) {
+    const nx = Math.floor(rnd() * 488);
+    const ny = Math.floor(rnd() * 210) + 12;
+    g.fillStyle = ny > 140 ? 'rgba(255, 128, 48, 0.12)' : 'rgba(42, 8, 8, 0.22)';
+    g.fillRect(nx, ny, 18 + Math.floor(rnd() * 36), 4 + Math.floor(rnd() * 10));
+  }
+  for (let i = 0; i < 220; i++) {
+    const x = Math.floor(rnd() * 508) + 2;
+    const y = Math.floor(rnd() * 190) + 50;
+    g.fillStyle = rnd() > 0.3 ? 'rgba(255, 176, 72, 0.45)' : 'rgba(56, 217, 245, 0.35)';
+    g.fillRect(x, y, 1, 1);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.generateMipmaps = false;
+  return tex;
+}
+
 export function createSky(ctx) {
   const group = new THREE.Group();
   group.name = 'worldSky';
@@ -115,7 +155,7 @@ export function createSky(ctx) {
   const skyTex = {
     hub: makeSkyTexture(PALETTES.hub.zenith),
     end: makeStarSkyTexture(),
-    nether: makeSkyTexture(PALETTES.nether.zenith),
+    nether: makeNetherSkyTexture(),
   };
 
   // Sky dome (1 draw call, SphereGeometry radius 145 never clips camera.far!)
@@ -210,8 +250,8 @@ export function createSky(ctx) {
 
     clouds.visible = p.clouds;
     if (ambient) {
-      ambient.intensity = currentArea === 'hub' ? 0.55 : currentArea === 'end' ? 0.84 : 0.46;
-      ambient.color.setHex(currentArea === 'nether' ? 0xffcfc2 : currentArea === 'end' ? 0xfffef5 : 0xffffff);
+      ambient.intensity = currentArea === 'hub' ? 0.55 : currentArea === 'end' ? 0.84 : 0.56;
+      ambient.color.setHex(currentArea === 'nether' ? 0xffdcd0 : currentArea === 'end' ? 0xfffef5 : 0xffffff);
     }
     hemi.color.setHex(p.hemiSky);
     hemi.groundColor.setHex(p.hemiGround);

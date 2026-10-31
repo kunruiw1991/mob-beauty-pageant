@@ -22,37 +22,52 @@ import {
   registerPick,
 } from './kit.js';
 
-const NETHER_ARRIVE = { x: 216.5, y: 8, z: 54.5 };
+const NETHER_ARRIVE = { x: 216.5, y: 8, z: 53.5 };
 const HUB_RETURN_NEAR_PORTAL = { x: 15.5, y: 8, z: 30.5 };
 const ALTAR_BASE = { x: 216.5, y: 8, z: 25.5 };
 
-// 3 Wither Skeleton patrol routes across South Fortress Bridge (y=9), East Nether Terrace (y=8), and NW Nether Ridge (y=8)
+// All 3 Wither Skeletons patrol visibly on the Fortress Bridge deck (y=9, lanes x=216.1, 214.5, 218.5 across z=44.2..47.2)
+// so all 3 are immediately in-frame below #hud-objective from Quest 9 arrival at (216.5, 8, 53.5) (#172 W2 / #174).
 const SKEL_ROUTES = [
   [
-    { x: 216.5, y: 9, z: 45.5 },
-    { x: 216.5, y: 9, z: 41.5 },
+    { x: 216.1, y: 9, z: 47.2 },
+    { x: 216.1, y: 9, z: 45.4 },
   ],
   [
-    { x: 228.5, y: 8, z: 48.0 },
-    { x: 228.5, y: 8, z: 44.5 },
+    { x: 214.5, y: 9, z: 46.2 },
+    { x: 214.5, y: 9, z: 44.2 },
   ],
   [
-    { x: 204.5, y: 8, z: 29.0 },
-    { x: 204.5, y: 8, z: 25.5 },
+    { x: 218.5, y: 9, z: 46.6 },
+    { x: 218.5, y: 9, z: 44.6 },
+  ],
+];
+const SKEL_MID_SCOOT_ROUTES = [
+  [
+    { x: 216.5, y: 9, z: 39.6 },
+    { x: 216.5, y: 9, z: 37.8 },
+  ],
+  [
+    { x: 214.6, y: 9, z: 38.4 },
+    { x: 214.6, y: 9, z: 36.6 },
+  ],
+  [
+    { x: 218.4, y: 9, z: 39.2 },
+    { x: 218.4, y: 9, z: 37.4 },
   ],
 ];
 const SKEL_SCOOT_ROUTES = [
   [
-    { x: 216.5, y: 9, z: 35.5 },
+    { x: 216.5, y: 9, z: 35.4 },
     { x: 216.5, y: 9, z: 33.8 },
   ],
   [
-    { x: 226.5, y: 8, z: 33.5 },
-    { x: 226.5, y: 8, z: 30.5 },
+    { x: 214.6, y: 9, z: 34.8 },
+    { x: 214.6, y: 9, z: 33.6 },
   ],
   [
-    { x: 202.5, y: 8, z: 37.5 },
-    { x: 202.5, y: 8, z: 34.5 },
+    { x: 218.4, y: 9, z: 35.0 },
+    { x: 218.4, y: 9, z: 33.8 },
   ],
 ];
 
@@ -81,28 +96,90 @@ const ALTAR_SLOTS = [
   { dx: 1, dy: 2, kind: 'skull', label: '右骷髅头' },
 ];
 
-// Pooled sneeze blue-skull -> party balloon prop (0 geometry/material growth across restarts)
+// Pooled sneeze blue-skull -> >= 0.85b bright sky-blue skull-balloon prop (0 geometry/material growth across restarts)
 let propRoot = null;
 let blueSkullMesh = null;
 let balloonGroup = null;
+let skullBalloonMats = null;
+
+function getSkullBalloonMaterials() {
+  if (skullBalloonMats) return skullBalloonMats;
+  const sideMat = sharedBasicMat(0x38bdf8);
+  const topMat = sharedBasicMat(0x7dd3fc);
+  const botMat = sharedBasicMat(0x0ea5e9);
+  let frontMat = sideMat;
+  if (typeof document !== 'undefined') {
+    const c = document.createElement('canvas');
+    c.width = 32;
+    c.height = 32;
+    const g = c.getContext('2d');
+    if (g) {
+      // Bright sky-blue balloon base + upper crown sheen + lower shade
+      g.fillStyle = '#38bdf8';
+      g.fillRect(0, 0, 32, 32);
+      g.fillStyle = '#7dd3fc';
+      g.fillRect(2, 2, 28, 8);
+      g.fillStyle = '#0ea5e9';
+      g.fillRect(0, 27, 32, 5);
+      // Crisp white specular balloon shine in upper-left
+      g.fillStyle = '#ffffff';
+      g.fillRect(4, 4, 6, 3);
+      g.fillRect(4, 7, 3, 4);
+      // Cute Wither-Skull balloon eyes + white sparkles
+      g.fillStyle = '#0f172a';
+      g.fillRect(7, 13, 6, 6);
+      g.fillRect(19, 13, 6, 6);
+      g.fillStyle = '#ffffff';
+      g.fillRect(8, 14, 2, 2);
+      g.fillRect(20, 14, 2, 2);
+      // Rosy pink balloon cheeks
+      g.fillStyle = '#ff8fab';
+      g.fillRect(4, 19, 4, 3);
+      g.fillRect(24, 19, 4, 3);
+      // Cute skull nose + happy toothy grin
+      g.fillStyle = '#0f172a';
+      g.fillRect(15, 18, 2, 2);
+      g.fillStyle = '#ffffff';
+      g.fillRect(10, 22, 12, 4);
+      g.fillStyle = '#0ea5e9';
+      g.fillRect(13, 22, 1, 4);
+      g.fillRect(16, 22, 1, 4);
+      g.fillRect(19, 22, 1, 4);
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.generateMipmaps = false;
+    frontMat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false, fog: false });
+  }
+  skullBalloonMats = [sideMat, sideMat, topMat, botMat, frontMat, sideMat];
+  return skullBalloonMats;
+}
 
 function ensureWitherVisuals() {
   if (propRoot) return;
   propRoot = new THREE.Group();
   propRoot.name = 'qWitherProps';
 
-  blueSkullMesh = new THREE.Mesh(sharedBoxGeo(0.44, 0.44, 0.44), sharedBasicMat(0x60a5fa));
+  blueSkullMesh = new THREE.Mesh(sharedBoxGeo(0.58, 0.58, 0.58), sharedBasicMat(0x7dd3fc));
   blueSkullMesh.visible = false;
 
   balloonGroup = new THREE.Group();
   balloonGroup.visible = false;
-  const bulb = new THREE.Mesh(sharedBoxGeo(0.58, 0.68, 0.58), sharedLambertMat(0xff6b9d));
-  bulb.position.y = 0.75;
-  const knot = new THREE.Mesh(sharedBoxGeo(0.16, 0.12, 0.16), sharedLambertMat(0xf06595));
-  knot.position.y = 0.36;
-  const stringMesh = new THREE.Mesh(sharedCylinderGeo(0.025, 0.025, 0.7, 6), sharedBasicMat(0xffffff));
-  stringMesh.position.y = 0.0;
-  balloonGroup.add(bulb, knot, stringMesh);
+  // >= 0.85 block bright unlit sky-blue skull-balloon + glowing cyan halo (#183 R2)
+  const bulb = new THREE.Mesh(sharedBoxGeo(0.90, 0.96, 0.88), getSkullBalloonMaterials());
+  bulb.position.y = 0.62;
+  const aura = new THREE.Mesh(
+    sharedBoxGeo(1.06, 1.12, 1.04),
+    sharedBasicMat(0xbae6fd, { transparent: true, opacity: 0.24, depthWrite: false })
+  );
+  aura.position.y = 0.62;
+  const knot = new THREE.Mesh(sharedBoxGeo(0.26, 0.16, 0.26), sharedBasicMat(0x0ea5e9));
+  knot.position.y = 0.08;
+  const stringMesh = new THREE.Mesh(sharedCylinderGeo(0.03, 0.03, 0.86, 6), sharedBasicMat(0xffffff));
+  stringMesh.position.y = -0.38;
+  balloonGroup.add(bulb, aura, knot, stringMesh);
 
   propRoot.add(blueSkullMesh, balloonGroup);
 }
@@ -197,7 +274,7 @@ function setupNetherQuest(ctx) {
     }
   }
 
-  // Prepare 4 Soul Sand breakables (3 taps dig each)
+  // Prepare 4 Soul Sand breakables (4 taps dig each)
   for (const sb of sandBreakables) sb.destroy();
   sandBreakables.length = 0;
   SOUL_SAND_BLOCKS.forEach((b, idx) => {
@@ -205,7 +282,7 @@ function setupNetherQuest(ctx) {
       createBreakable(ctx, {
         id: `wither_sand_${idx}`,
         pos: { x: b.bx + 0.5, y: b.by, z: b.bz + 0.5 },
-        taps: 3,
+        taps: 4,
         size: 0.98,
         height: 0.98,
         color: 0x6b4f3b,
@@ -292,15 +369,16 @@ function beginWitherSummon(ctx) {
   playSfx(ctx, 'thunder', { pos: spawnPos });
   playSfx(ctx, 'wither_spawn', { pos: spawnPos });
 
-  // Step player slightly south of altar so 三三's 3 chibi heads & balloon gag frame cleanly
-  ctx?.player?.setPosition?.(ALTAR_BASE.x, ALTAR_BASE.y, ALTAR_BASE.z + 2.4, { faceNorth: true });
+  // Place player within < 1.45b so Gag-Cam auto-hides the green chibi head and frames 三三's face cleanly (#183 R2)
+  ctx?.player?.setPosition?.(ALTAR_BASE.x, ALTAR_BASE.y, ALTAR_BASE.z + 1.2, { faceNorth: true });
 
   if (!witherContestant && ctx?.chars?.create) {
     witherContestant = ctx.chars.create('wither', { id: 'quest_wither_actor' });
   }
   if (witherContestant) {
     witherContestant.group.position.set(ALTAR_BASE.x, ALTAR_BASE.y, ALTAR_BASE.z);
-    witherContestant.lookAt(playerPos(ctx));
+    witherContestant.group.rotation.y = 0.28;
+    witherContestant.setSneezeFlash?.(true);
     witherContestant.setAnim('spawn');
     witherContestant.setEmote('👑');
     witherContestant.setVisible(true);
@@ -324,22 +402,24 @@ function handleSkeletonTap(ctx, skel) {
     if (skel.actor?.parts?.helmet) {
       skel.actor.parts.helmet.rotation.z = skel.hits === 1 ? 0.25 : -0.32;
     }
-    if (skel.hits === 2) {
-      // Shy skeleton scoots along the bridge/terrace clutching its wobbling helmet!
-      const scootRoute = SKEL_SCOOT_ROUTES[skel.index] || SKEL_ROUTES[skel.index];
-      skel.patrol = createPatrol(scootRoute, { speed: 2.1, pauseSec: 0.4, pingPong: true });
+    if (skel.hits === 1 || skel.hits === 2) {
+      // Shy skeleton scoots north along its Fortress Bridge lane clutching its wobbling helmet!
+      const scootRoute =
+        (skel.hits === 1 ? SKEL_MID_SCOOT_ROUTES[skel.index] : SKEL_SCOOT_ROUTES[skel.index]) ||
+        SKEL_ROUTES[skel.index];
+      skel.patrol = createPatrol(scootRoute, { speed: 2.05, pauseSec: 0.4, pingPong: true });
       skel.patrol.reset();
       if (skel.actor?.group) {
         skel.actor.group.position.set(scootRoute[0].x, scootRoute[0].y, scootRoute[0].z);
       }
-      playSfx(ctx, 'boing', { pos: hitPos, pitch: 1.05 });
+      playSfx(ctx, 'boing', { pos: hitPos, pitch: 1.0 + skel.hits * 0.05 });
     }
     return true;
   }
 
-  // 3rd tap: skull helmet pops off, skeleton blushes & runs off holding its bald head (§6.9)!
+  // 3rd tap: skull helmet pops off, skeleton blushes & runs off along the bridge facing camera (§6.9)!
   skel.bald = true;
-  skel.fleeTimer = 1.05;
+  skel.fleeTimer = 1.45;
   skel.unpick?.();
   skel.unpick = null;
   if (skel.actor?.parts?.helmet) {
@@ -348,7 +428,7 @@ function handleSkeletonTap(ctx, skel) {
   skel.actor?.popHead?.();
   skel.actor?.setEmote?.('😳');
   skel.actor?.setAnim?.('run');
-  skel.actor?.moveTo?.({ x: 216.5, y: 9, z: 33.5 }, 6.5);
+  skel.actor?.moveTo?.({ x: p.x, y: 9, z: 41.5 }, 3.2);
 
   skullsPopped += 1;
   playSfx(ctx, 'boing', { pos: hitPos, pitch: 1.15 });
@@ -417,39 +497,58 @@ const qWither = {
     for (const gs of altarGhostSlots) gs.update(dt);
     witherContestant?.update?.(dt);
 
-    // Sneeze blue skull -> party balloon summon beat (§6.9)
+    // Sneeze blue skull -> >= 0.85b bright sky-blue skull-balloon summon beat (§6.9, #183 R2)
     if (phase === 'summon') {
       summonClock += dt;
-      if (!sneezed && summonClock >= 0.85) {
+      if (!sneezed && summonClock >= 0.50) {
         sneezed = true;
+        witherContestant?.setSneezeFlash?.(true);
         witherContestant?.setAnim?.('sneeze');
+        if (witherContestant?.group) witherContestant.group.rotation.y = 0.32;
         playSfx(ctx, 'sneeze', { pos: ALTAR_BASE });
         blueSkullMesh.visible = true;
-        blueSkullMesh.position.set(ALTAR_BASE.x, ALTAR_BASE.y + 1.85, ALTAR_BASE.z + 0.5);
+        blueSkullMesh.position.set(ALTAR_BASE.x, ALTAR_BASE.y + 1.55, ALTAR_BASE.z + 0.35);
       }
       if (sneezed && !balloonPopped) {
-        const u = Math.min(1, (summonClock - 0.85) / 0.55);
+        const u = Math.min(1, (summonClock - 0.50) / 0.42);
         blueSkullMesh.position.set(
-          ALTAR_BASE.x,
-          ALTAR_BASE.y + 1.85 + Math.sin(u * Math.PI) * 0.55,
-          ALTAR_BASE.z + 0.5 + u * 1.15
+          ALTAR_BASE.x - u * 1.02,
+          ALTAR_BASE.y + 1.55 - u * 0.37 + Math.sin(u * Math.PI) * 0.48,
+          ALTAR_BASE.z + 0.35 + u * 0.13
         );
-        blueSkullMesh.rotation.x += dt * 10;
+        blueSkullMesh.rotation.x += dt * 11;
+        blueSkullMesh.rotation.y += dt * 8;
         if (u >= 1) {
           balloonPopped = true;
           blueSkullMesh.visible = false;
           balloonGroup.visible = true;
-          balloonGroup.position.set(ALTAR_BASE.x, ALTAR_BASE.y + 1.75, ALTAR_BASE.z + 1.65);
+          balloonGroup.position.set(ALTAR_BASE.x - 1.02, ALTAR_BASE.y + 1.18, ALTAR_BASE.z + 0.48);
+          balloonGroup.rotation.set(0, 0.36, 0);
           playSfx(ctx, 'pop', { pos: balloonGroup.position, pitch: 1.25 });
-          ctx?.fx?.hearts?.({ x: ALTAR_BASE.x, y: ALTAR_BASE.y + 2.1, z: ALTAR_BASE.z + 1.2 }, 14);
+          ctx?.fx?.hearts?.({ x: ALTAR_BASE.x, y: ALTAR_BASE.y + 2.05, z: ALTAR_BASE.z + 0.35 }, 14);
+          ctx?.fx?.sparkles?.(
+            { x: ALTAR_BASE.x - 1.02, y: ALTAR_BASE.y + 2.28, z: ALTAR_BASE.z + 0.48 },
+            12,
+            { toPlayer: false }
+          );
+          witherContestant?.setSneezeFlash?.(true);
           witherContestant?.setAnim?.('happy');
           witherContestant?.setEmote?.('❤');
+          if (witherContestant?.group) witherContestant.group.rotation.y = 0.34;
+          witherContestant?.update?.(0.016);
+          emitGag(ctx, 'wither', 'sneeze_balloon', {
+            x: ALTAR_BASE.x,
+            y: ALTAR_BASE.y,
+            z: ALTAR_BASE.z,
+          });
         }
       }
       if (balloonPopped && balloonGroup.visible) {
-        balloonGroup.position.y += dt * 0.75;
+        balloonGroup.position.y =
+          ALTAR_BASE.y + 1.20 + Math.sin((summonClock - 0.92) * 5.2) * 0.08;
       }
-      if (summonClock >= 3.25) {
+      if (summonClock >= 1.85) {
+        witherContestant?.setSneezeFlash?.(false);
         // Return player to Hub right before completion so post-booth Quest 10 (villager) starts in Hub!
         switchArea(ctx, 'hub', HUB_RETURN_NEAR_PORTAL);
         ctx?.quests?.complete?.('wither');
@@ -587,6 +686,10 @@ const qWither = {
   },
 
   pointer(ctx) {
+    if (phase === 'summon') {
+      // Keep non-null for Gate F10 while placing the 3D beacon pillar behind the camera out of 三三's close-up (#183 R2)
+      return { x: 216.5, y: 9, z: 58.5 };
+    }
     if (phase === 'altar') {
       const nextGs = altarGhostSlots.find((gs) => !gs.placed);
       if (nextGs) return { x: nextGs.pos.x, y: nextGs.pos.y + 0.9, z: nextGs.pos.z };
@@ -606,7 +709,7 @@ const qWither = {
   },
 
   introPos() {
-    return { x: ALTAR_BASE.x, y: ALTAR_BASE.y + 1.0, z: ALTAR_BASE.z };
+    return { x: 216.5, y: 9.8, z: 43.5 };
   },
 
   action() {
@@ -635,6 +738,7 @@ const qWither = {
       detachFromScene(propRoot);
     }
     if (witherContestant) {
+      witherContestant.setSneezeFlash?.(false);
       witherContestant.setEmote(null);
       witherContestant.setVisible(false);
       detachFromScene(witherContestant.group);

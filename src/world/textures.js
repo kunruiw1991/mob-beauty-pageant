@@ -588,9 +588,12 @@ export function createTextures() {
   });
 
   alloc('netherrack', ({ fillNoise, setPx, rnd }) => {
-    fillNoise(0x6f2828, 18);
-    for (let i = 0; i < 28; i++) {
-      setPx((rnd() * 16) | 0, (rnd() * 16) | 0, 142, 54, 50);
+    fillNoise(0x7c2b29, 19);
+    for (let i = 0; i < 38; i++) {
+      const x = (rnd() * 16) | 0;
+      const y = (rnd() * 16) | 0;
+      if (rnd() > 0.42) setPx(x, y, 162, 64, 56);
+      else setPx(x, y, 88, 24, 24);
     }
   });
   alloc('nether_brick', ({ fillNoise, setPx }) => {
@@ -708,6 +711,174 @@ export function createTextures() {
     rect(10, 8, 3, 2, 0xfaf5f5);
   });
 
+  // W2 Nether overhaul blocks: basalt, soul_soil, soul_fire (animated!), nether_wart
+  alloc('basalt_side', ({ setPx, rnd }) => {
+    const colBase = [64, 86, 52, 74, 96, 58, 70, 88, 50, 78, 94, 56, 68, 84, 54, 76];
+    for (let y = 0; y < 16; y++) {
+      for (let x = 0; x < 16; x++) {
+        let v = colBase[x] + ((rnd() - 0.5) * 14);
+        if ((y + x * 3) % 7 === 0) v -= 14;
+        setPx(x, y, v, v - 1, v + 5);
+      }
+    }
+  });
+  alloc('basalt_top', ({ setPx, rnd }) => {
+    for (let y = 0; y < 16; y++) {
+      for (let x = 0; x < 16; x++) {
+        const d = Math.max(Math.abs(x - 7.5), Math.abs(y - 7.5));
+        const ring = d < 2.2 ? 96 : d < 4.5 ? 58 : d < 6.5 ? 84 : 52;
+        const j = (rnd() - 0.5) * 12;
+        setPx(x, y, ring + j, ring - 1 + j, ring + 6 + j);
+      }
+    }
+  });
+  alloc('soul_soil', ({ setPx, rnd }) => {
+    for (let y = 0; y < 16; y++) {
+      for (let x = 0; x < 16; x++) {
+        const swirl = Math.sin(x * 0.5 + y * 0.35) * 11 + Math.cos(x * 0.3 - y * 0.55) * 8;
+        const j = (rnd() - 0.5) * 10;
+        setPx(x, y, 74 + swirl + j, 55 + swirl * 0.8 + j, 44 + swirl * 0.7 + j);
+      }
+    }
+  });
+
+  const soulFireSlot = alloc('soul_fire', ({ rect }) => rect(4, 6, 8, 10, 0x38d9f5));
+  const soulFireImg = g.createImageData(16, 16);
+  function drawSoulFireFrame(phase) {
+    const d = soulFireImg.data;
+    d.fill(0);
+    for (let x = 1; x < 15; x++) {
+      const centerBias = 1 - Math.abs(x - 7.5) / 7.5;
+      const tongue = Math.sin(x * 0.95 + phase * 1.9) * 2.2 + Math.cos(x * 1.7 - phase * 1.4) * 1.4;
+      const topY = Math.max(1, Math.min(13, Math.round(13 - centerBias * 10.5 - tongue)));
+      for (let y = topY; y < 16; y++) {
+        const hFrac = (15 - y) / Math.max(1, 15 - topY); // 0 at base -> 1 at tip
+        let r = 14, gr = 165, b = 210;
+        if (hFrac < 0.35 && centerBias > 0.35) {
+          r = 224; gr = 252; b = 255; // white-cyan hot core
+        } else if (hFrac < 0.68) {
+          r = 56; gr = 224; b = 248;  // bright cyan-turquoise mid flame
+        } else {
+          r = 14; gr = 148; b = 204;  // deep soul-blue tip
+        }
+        const i = (y * 16 + x) * 4;
+        d[i] = r; d[i + 1] = gr; d[i + 2] = b; d[i + 3] = 255;
+      }
+    }
+    const tx = (soulFireSlot % COLS) * TILE;
+    const ty = ((soulFireSlot / COLS) | 0) * TILE;
+    g.putImageData(soulFireImg, tx, ty);
+  }
+  drawSoulFireFrame(0);
+
+  alloc('nether_wart', ({ rect, setPx }) => {
+    // 3 crimson bulbous MC nether wart stalks rising from bottom
+    for (const sx of [3, 7, 12]) {
+      rect(sx, 10, 2, 6, 0x6b1118);
+    }
+    rect(1, 6, 5, 5, 0xa81c24);
+    rect(2, 5, 3, 2, 0xd9363e);
+    setPx(2, 6, 244, 114, 114);
+
+    rect(6, 4, 5, 6, 0xb51f27);
+    rect(7, 3, 3, 2, 0xe03e46);
+    setPx(7, 4, 248, 128, 128);
+
+    rect(10, 7, 5, 4, 0x9c1920);
+    rect(11, 6, 3, 2, 0xcf2f37);
+    setPx(12, 7, 244, 114, 114);
+  });
+
+  // W3 SW Jungle blocks: melon, bamboo, cocoa, fern
+  alloc('melon_side', ({ setPx, rnd }) => {
+    const stripe = [0, 1, 2, 1, 0, 1, 2, 1, 0, 1, 2, 1, 0, 1, 2, 1];
+    const pal = [
+      [68, 112, 24],
+      [110, 168, 40],
+      [146, 204, 58],
+    ];
+    for (let y = 0; y < 16; y++) {
+      for (let x = 0; x < 16; x++) {
+        const [r, gr, b] = pal[stripe[x]];
+        const j = (rnd() - 0.5) * 14;
+        setPx(x, y, r + j, gr + j, b + j * 0.7);
+      }
+    }
+  });
+  alloc('melon_top', ({ setPx, rnd }) => {
+    for (let y = 0; y < 16; y++) {
+      for (let x = 0; x < 16; x++) {
+        const dx = x - 7.5, dy = y - 7.5;
+        const ang = Math.atan2(dy, dx);
+        const spoke = Math.sin(ang * 8) > 0.25;
+        const j = (rnd() - 0.5) * 12;
+        if (Math.hypot(dx, dy) < 1.8) {
+          setPx(x, y, 132 + j, 114 + j, 62 + j);
+        } else if (spoke) {
+          setPx(x, y, 138 + j, 196 + j, 54 + j);
+        } else {
+          setPx(x, y, 86 + j, 138 + j, 30 + j);
+        }
+      }
+    }
+  });
+  alloc('bamboo_stalk', ({ setPx, rnd }) => {
+    for (let y = 0; y < 16; y++) {
+      const isNode = y === 3 || y === 11;
+      for (let x = 0; x < 16; x++) {
+        const shade = x < 4 || x > 12 ? -18 : x >= 6 && x <= 9 ? 16 : 0;
+        const j = (rnd() - 0.5) * 8;
+        if (isNode) {
+          setPx(x, y, 178 + shade * 0.5 + j, 228 + shade * 0.5 + j, 96 + j);
+        } else {
+          setPx(x, y, 102 + shade + j, 188 + shade + j, 40 + j * 0.5);
+        }
+      }
+    }
+  });
+  alloc('bamboo_leaves', ({ setPx }) => {
+    const fronds = [
+      [7, 13], [6, 12], [5, 11], [4, 10], [3, 9], [2, 9],
+      [8, 12], [9, 11], [10, 10], [11, 9], [12, 8], [13, 8],
+      [7, 8], [6, 7], [5, 6], [4, 5], [3, 5],
+      [8, 7], [9, 6], [10, 5], [11, 4], [12, 4],
+    ];
+    for (const [fx, fy] of fronds) {
+      setPx(fx, fy, 126, 214, 56, 255);
+      setPx(fx, fy + 1, 78, 162, 34, 255);
+    }
+  });
+  alloc('cocoa', ({ rect, setPx, rnd }) => {
+    rect(0, 0, 16, 16, 0xc76d28, 255, 10);
+    for (const rx of [2, 6, 10, 14]) {
+      rect(rx, 1, 2, 14, 0x8f4314, 255, 6);
+    }
+    for (const hx of [4, 8, 12]) {
+      rect(hx, 2, 2, 11, 0xf09d46, 255, 6);
+    }
+    for (let x = 0; x < 16; x++) {
+      setPx(x, 0, 96 + ((rnd() * 12) | 0), 52, 18);
+      setPx(x, 15, 88 + ((rnd() * 12) | 0), 44, 14);
+    }
+  });
+  alloc('fern', ({ setPx }) => {
+    // Lush jagged MC jungle fern silhouette
+    for (let y = 3; y < 16; y++) {
+      setPx(7, y, 36, 118, 34, 255);
+      setPx(8, y, 48, 142, 42, 255);
+      const span = Math.max(1, Math.round(((y - 2) / 13) * 6.5));
+      if (y % 2 === 1) {
+        for (let dx = 1; dx <= span; dx++) {
+          const tip = dx === span;
+          setPx(7 - dx, y - (dx >> 1), tip ? 92 : 56, tip ? 198 : 162, tip ? 72 : 48, 255);
+          setPx(8 + dx, y - (dx >> 1), tip ? 92 : 56, tip ? 198 : 162, tip ? 72 : 48, 255);
+        }
+      }
+    }
+    setPx(7, 2, 104, 208, 80, 255);
+    setPx(8, 2, 104, 208, 80, 255);
+  });
+
   const atlas = new THREE.CanvasTexture(canvas);
   atlas.colorSpace = THREE.SRGBColorSpace;
   atlas.magFilter = THREE.NearestFilter;
@@ -794,6 +965,14 @@ export function createTextures() {
     [B.CAKE]: topBotSide('cake_top', 'cake_side', 'cake_side'),
     [B.BLEACHER_LOW]: all6('planks'),
     [B.BLEACHER_HIGH]: all6('planks'),
+    [B.BASALT]: topBotSide('basalt_top', 'basalt_top', 'basalt_side'),
+    [B.SOUL_SOIL]: all6('soul_soil'),
+    [B.SOUL_FIRE]: all6('soul_fire'),
+    [B.NETHER_WART]: all6('nether_wart'),
+    [B.MELON]: topBotSide('melon_top', 'melon_top', 'melon_side'),
+    [B.BAMBOO]: [s('bamboo_stalk'), s('bamboo_stalk'), s('bamboo_stalk'), s('bamboo_leaves'), s('bamboo_stalk'), s('bamboo_stalk')],
+    [B.COCOA]: all6('cocoa'),
+    [B.FERN]: all6('fern'),
   };
 
   const INSET_U = 0.08 / (COLS * TILE);
@@ -811,8 +990,8 @@ export function createTextures() {
   }
 
   // Precompute fast lookup table: blockId * 24 + face * 4 -> [u0, v0, u1, v1]
-  const uvTable = new Float32Array(72 * 6 * 4);
-  for (let id = 1; id < 72; id++) {
+  const uvTable = new Float32Array(96 * 6 * 4);
+  for (let id = 1; id < 96; id++) {
     const faces = faceMap[id];
     if (!faces) continue;
     for (let f = 0; f < 6; f++) {
@@ -831,6 +1010,7 @@ export function createTextures() {
     if (step !== lastLavaStep) {
       lastLavaStep = step;
       drawLavaFrame(step * 0.42);
+      drawSoulFireFrame(step * 0.55);
       atlas.needsUpdate = true;
     }
   }

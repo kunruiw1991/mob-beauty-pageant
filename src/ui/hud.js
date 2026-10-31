@@ -530,6 +530,7 @@ export function createUI(ctx = {}) {
     mountRoot: uiMount,
     onPauseChange: () => refreshHudMask(),
     onOpenBoard: async () => {
+      nextUI?.hide?.();
       await boardUI.show({ mode: 'view' });
       refreshHudMask();
     },
@@ -549,6 +550,7 @@ export function createUI(ctx = {}) {
   hudUI = createHudUI(ctx, {
     isModalOpen: isAnyOverlayActive,
     onOpenBoardView: async () => {
+      nextUI?.hide?.();
       const prevScene = ctx.state?.scene || 'world';
       await boardUI.show({ mode: 'view' });
       if (ctx.state && prevScene === 'world') ctx.state.scene = 'world';
@@ -632,19 +634,21 @@ export function createUI(ctx = {}) {
 
     showBooth: async (contestantId) => {
       skipNextOnce = false;
+      nextUI?.hide?.();
       const res = await boothUI.show(contestantId);
       refreshHudMask();
       return res;
     },
     showBoard: async (opts) => {
       skipNextOnce = false;
+      nextUI?.hide?.();
       const res = await boardUI.show(opts);
       hudUI.update(ctx.state);
       refreshHudMask();
       return res;
     },
     showNext: async (contestantId) => {
-      if (skipNextOnce) {
+      if (skipNextOnce || boardUI.isActive() || boothUI.isActive()) {
         skipNextOnce = false;
         refreshHudMask();
         return;

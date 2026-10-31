@@ -82,6 +82,14 @@ export const B = Object.freeze({
   CAKE: 68,
   BLEACHER_LOW: 69,
   BLEACHER_HIGH: 70,
+  BASALT: 71,
+  SOUL_SOIL: 72,
+  SOUL_FIRE: 73,
+  NETHER_WART: 74,
+  MELON: 75,
+  BAMBOO: 76,
+  COCOA: 77,
+  FERN: 78,
 });
 
 // Render shapes:
@@ -106,12 +114,12 @@ const DEFS = [
   [B.ICE, 'ice', 0x92b9fe, { solid: true, transparent: true, walkable: true, breakable: true, pass: 'trans', alpha: 0.78 }],
   [B.WATER, 'water', 0x2f68d8, { solid: false, transparent: true, walkable: false, breakable: false, pickable: false, pass: 'trans', alpha: 0.72, topY: 0.88 }],
   [B.OAK_LOG, 'oak_log', 0x6b5130, { solid: true, transparent: false, walkable: true, breakable: true }],
-  [B.OAK_LEAVES, 'oak_leaves', 0x489c32, { solid: true, transparent: true, walkable: true, breakable: true, pass: 'cutout' }],
+  [B.OAK_LEAVES, 'oak_leaves', 0x489c32, { solid: true, transparent: true, walkable: false, breakable: true, pass: 'cutout' }],
   [B.SPRUCE_LOG, 'spruce_log', 0x3b2713, { solid: true, transparent: false, walkable: true, breakable: true }],
-  [B.SPRUCE_LEAVES, 'spruce_leaves', 0x2e5c36, { solid: true, transparent: true, walkable: true, breakable: true, pass: 'cutout' }],
+  [B.SPRUCE_LEAVES, 'spruce_leaves', 0x2e5c36, { solid: true, transparent: true, walkable: false, breakable: true, pass: 'cutout' }],
   [B.JUNGLE_LOG, 'jungle_log', 0x57441b, { solid: true, transparent: false, walkable: true, breakable: true }],
-  [B.JUNGLE_LEAVES, 'jungle_leaves', 0x3ca828, { solid: true, transparent: true, walkable: true, breakable: true, pass: 'cutout' }],
-  [B.VINES, 'vines', 0x3c8e29, { solid: false, transparent: true, walkable: false, breakable: true, pickable: true, pass: 'cutout', shape: 'vine' }],
+  [B.JUNGLE_LEAVES, 'jungle_leaves', 0x3ca828, { solid: true, transparent: true, walkable: false, breakable: true, pass: 'cutout' }],
+  [B.VINES, 'vines', 0x3c8e29, { solid: false, transparent: true, walkable: false, breakable: true, pickable: false, pass: 'cutout', shape: 'vine' }],
   [B.POPPY, 'poppy', 0xe23226, { solid: false, transparent: true, walkable: false, breakable: true, pickable: true, pass: 'cutout', shape: 'cross' }],
   [B.DANDELION, 'dandelion', 0xf5d623, { solid: false, transparent: true, walkable: false, breakable: true, pickable: true, pass: 'cutout', shape: 'cross' }],
   [B.CORNFLOWER, 'cornflower', 0x466eeb, { solid: false, transparent: true, walkable: false, breakable: true, pickable: true, pass: 'cutout', shape: 'cross' }],
@@ -166,6 +174,14 @@ const DEFS = [
   [B.CAKE, 'cake', 0xf7e6e6, { solid: false, transparent: true, walkable: false, breakable: true, pickable: true, pass: 'cutout', shape: 'cake' }],
   [B.BLEACHER_LOW, 'bleacher_low', 0xa8834c, { solid: true, transparent: true, walkable: false, breakable: false, topY: 0.6 }],
   [B.BLEACHER_HIGH, 'bleacher_high', 0xa8834c, { solid: true, transparent: true, walkable: false, breakable: false, topY: 0.4 }],
+  [B.BASALT, 'basalt', 0x49484d, { solid: true, transparent: false, walkable: true, breakable: true }],
+  [B.SOUL_SOIL, 'soul_soil', 0x46352a, { solid: true, transparent: false, walkable: true, breakable: true }],
+  [B.SOUL_FIRE, 'soul_fire', 0x38d9f5, { solid: false, transparent: true, walkable: false, breakable: false, pickable: false, blocksWalk: false, pass: 'cutout', shape: 'cross', emissive: true }],
+  [B.NETHER_WART, 'nether_wart', 0xa61e24, { solid: false, transparent: true, walkable: false, breakable: true, pickable: false, blocksWalk: false, pass: 'cutout', shape: 'cross' }],
+  [B.MELON, 'melon', 0x72ad28, { solid: true, transparent: false, walkable: true, breakable: true }],
+  [B.BAMBOO, 'bamboo', 0x6bbf2a, { solid: true, transparent: true, walkable: false, breakable: true, pickable: false, blocksWalk: true, pass: 'cutout', shape: 'bamboo' }],
+  [B.COCOA, 'cocoa', 0xc76d28, { solid: false, transparent: true, walkable: false, breakable: true, pickable: false, blocksWalk: false, pass: 'cutout', shape: 'cocoa' }],
+  [B.FERN, 'fern', 0x379e32, { solid: false, transparent: true, walkable: false, breakable: true, pickable: false, blocksWalk: false, pass: 'cutout', shape: 'cross' }],
 ];
 
 export const BLOCK_PROPS = [];
