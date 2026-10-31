@@ -17,6 +17,9 @@ export function createCameraRig(ctx) {
 
   let focusPoint = null;
   let focusOpts = null;
+  let focusPunchDist = 0;
+  let focusPunchFov = 0;
+  let focusDurationLeft = 0;
 
   // Built-in fallback shake if fx-audio isn't active or cam.shake() is called directly
   const fallbackShakeOffset = new THREE.Vector3();
@@ -25,41 +28,61 @@ export function createCameraRig(ctx) {
   let shakeElapsed = 0;
   let shakePhase = 0;
 
-  const TAN_PITCH_52 = Math.tan((52 * Math.PI) / 180); // ~1.27994 (~52° downward pitch per #144)
+  const DEG2RAD = Math.PI / 180;
+  const lerpNum = (a, b, t) => a + (b - a) * t;
+  const clamp01 = (v) => Math.max(0, Math.min(1, v));
 
   function computeLensParams() {
     const w = window.innerWidth || 1280;
     const h = Math.max(1, window.innerHeight || 800);
     const asp = w / h;
+    const inWorld = (ctx.state?.scene || 'title') === 'world';
 
-    // Aspect-adaptive portrait vs landscape (§8.7 + #144: ~52° pitch & player at ~58% screen height)
-    let fov = 50;
-    let dist = 7.5;
-    let lookAhead = 1.32;
+    // #160 G3 aspect-adaptive world framing:
+    // - Desktop (1280x800, asp ~1.6): vFOV ~55°, pitch ~49°, dist ~8.2, player ~61% height, 15b ahead on-screen
+    // - Phone landscape (asp >= 1.8, e.g. 844x390): vFOV ~60°, pitch ~46°, dist 7.5*1.3=9.75, player ~64% height, 15b+ ahead on-screen
+    // - Phone portrait (asp < 1.0, e.g. 390x844): vFOV ~70°, pitch ~48°, dist ~9.6, player ~60% height, 15b ahead on-screen
+    let fov = 55;
+    let pitchDeg = 49;
+    let dist = 8.2;
+    let lookAhead = 2.25;
     const targetY = 0.95;
 
-    if (asp < 1) {
-      // Portrait (e.g. 390x844 -> asp ~ 0.46)
-      const t = Math.min(1, (1 - asp) / 0.56);
-      const scale = 1 + t * 0.28;
-      fov = 50 + t * 12; // up to 62 deg
-      dist = 7.5 * scale;
-      lookAhead = (1.32 + t * 0.36) * scale;
-    } else if (asp > 1.85) {
-      // Short landscape (e.g. 844x390 -> asp ~ 2.16)
-      fov = 46;
-      dist = 7.2;
-      lookAhead = 1.18;
+    if (asp < 1.0) {
+      const t = clamp01((1.0 - asp) / 0.48); // t=1 at asp<=0.52 (390x844 -> 0.462)
+      fov = lerpNum(58, 70, t);
+      pitchDeg = lerpNum(49, 48, t);
+      dist = lerpNum(8.5, 9.6, t);
+      lookAhead = lerpNum(2.4, 3.2, t);
+    } else if (asp < 1.6) {
+      const t = clamp01((asp - 1.0) / 0.6);
+      fov = lerpNum(58, 55, t);
+      pitchDeg = 49;
+      dist = lerpNum(8.5, 8.2, t);
+      lookAhead = lerpNum(2.4, 2.25, t);
+    } else {
+      const t = clamp01((asp - 1.6) / 0.2); // t=1 for all asp >= 1.8 (844x390 -> 2.164)
+      fov = lerpNum(55, 60, t);
+      pitchDeg = lerpNum(49, 46, t);
+      dist = lerpNum(8.2, 7.5 * 1.3, t); // 9.75 at asp >= 1.8
+      lookAhead = lerpNum(2.25, 3.79, t); // player at ~64% height
     }
 
-    const height = targetY + (dist + lookAhead) * TAN_PITCH_52;
+    if (!inWorld) {
+      // Keep title / booth / finale stage lenses free of wide-angle distortion
+      fov = asp < 1.0 ? lerpNum(52, 62, clamp01((1.0 - asp) / 0.54)) : asp >= 1.8 ? 52 : 50;
+    } else if (mode === 'focus' && focusPunchFov !== 0) {
+      fov = Math.max(40, fov + focusPunchFov);
+    }
+
+    const height = targetY + (dist + lookAhead) * Math.tan(pitchDeg * DEG2RAD);
 
     if (Math.abs(camera.fov - fov) > 0.05 || Math.abs(camera.aspect - asp) > 0.001) {
       camera.fov = fov;
       camera.aspect = asp;
       camera.updateProjectionMatrix();
     }
-    return { dist, height, lookAhead, targetY, asp };
+    return { dist, height, lookAhead, targetY, asp, fov, pitchDeg };
   }
 
   function resize() {
@@ -82,21 +105,41 @@ export function createCameraRig(ctx) {
     if (!pos) return;
     mode = 'focus';
     focusPoint = new THREE.Vector3(pos.x ?? 48, pos.y ?? 9, pos.z ?? 52);
+    const punch = Math.max(0, Number(opts.zoomPunch) || 0);
+    focusPunchDist = punch;
+    focusPunchFov = punch > 0 ? 3.5 : 0; // starts slightly wider and punches in by -3.5°
+    focusDurationLeft = Number(opts.duration) > 0 ? Number(opts.duration) : 0;
     focusOpts = {
-      distance: opts.distance ?? 8.2,
-      height: opts.height ?? 3.1,
+      distance: opts.distance ?? 6.0,
+      height: opts.height ?? 2.75,
       yaw: opts.yaw ?? 0,
       instant: Boolean(opts.instant),
+      hasPunch: punch > 0,
+      manualClearOnly: Boolean(opts.manualClearOnly),
     };
     if (focusOpts.instant) {
       snap();
     }
   }
 
+  function updateFocusTarget(pos, opts = {}) {
+    if (mode !== 'focus' || !focusPoint || !pos) return;
+    focusPoint.set(pos.x ?? focusPoint.x, pos.y ?? focusPoint.y, pos.z ?? focusPoint.z);
+    if (focusOpts) {
+      focusOpts.liveTrack = true;
+      if (opts.distance !== undefined) focusOpts.distance = opts.distance;
+      if (opts.height !== undefined) focusOpts.height = opts.height;
+    }
+  }
+
   function clearFocus() {
     focusPoint = null;
     focusOpts = null;
+    focusPunchDist = 0;
+    focusPunchFov = 0;
+    focusDurationLeft = 0;
     mode = ctx.state?.scene === 'title' ? 'title' : 'follow';
+    computeLensParams();
   }
 
   function setMode(nextMode) {
@@ -104,7 +147,11 @@ export function createCameraRig(ctx) {
     if (nextMode !== 'focus') {
       focusPoint = null;
       focusOpts = null;
+      focusPunchDist = 0;
+      focusPunchFov = 0;
+      focusDurationLeft = 0;
     }
+    computeLensParams();
   }
 
   function shake(intensity = 0.5, seconds = 0.45) {
@@ -154,8 +201,9 @@ export function createCameraRig(ctx) {
 
     if (mode === 'focus' && focusPoint) {
       const fYaw = focusOpts?.yaw ?? 0;
-      const fDist = focusOpts?.distance ?? 8.2;
-      const fHeight = focusOpts?.height ?? 3.1;
+      const portraitScale = (ctx.state?.scene === 'world' && computeLensParams().asp < 0.72) ? 1.14 : 1.0;
+      const fDist = ((focusOpts?.distance ?? 6.0) + focusPunchDist) * portraitScale;
+      const fHeight = (focusOpts?.height ?? 2.75) + focusPunchDist * 0.32;
       target.copy(focusPoint);
       desiredPos.set(
         focusPoint.x + Math.sin(fYaw) * fDist,
@@ -196,12 +244,35 @@ export function createCameraRig(ctx) {
   }
 
   function update(dt) {
+    const safeDt = Math.max(0.001, dt);
+    if (mode === 'focus') {
+      if (focusOpts?.hasPunch && (focusPunchDist > 0.002 || Math.abs(focusPunchFov + 2.5) > 0.01)) {
+        const punchDecay = Math.exp(-10.5 * safeDt);
+        focusPunchDist *= punchDecay;
+        if (focusPunchDist < 0.003) focusPunchDist = 0;
+        // Ease FOV from +3.5° down to -2.5° for a crisp comedic zoom-in punch
+        focusPunchFov = -2.5 + (focusPunchFov + 2.5) * punchDecay;
+      }
+      if (focusDurationLeft > 0 && !focusOpts?.manualClearOnly) {
+        focusDurationLeft -= safeDt;
+        if (focusDurationLeft <= 0) {
+          clearFocus();
+        }
+      }
+    }
+
     computeDesired();
     updateFallbackShake(dt);
 
-    const alpha = Math.min(1, 1 - Math.exp(-9.5 * Math.max(0.001, dt)));
-    currentPos.lerp(desiredPos, alpha);
-    currentLook.lerp(target, alpha);
+    if (mode === 'focus' && focusOpts?.liveTrack) {
+      currentPos.copy(desiredPos);
+      currentLook.copy(target);
+    } else {
+      const rate = mode === 'focus' ? 14.0 : 9.5;
+      const alpha = Math.min(1, 1 - Math.exp(-rate * safeDt));
+      currentPos.lerp(desiredPos, alpha);
+      currentLook.lerp(target, alpha);
+    }
 
     // Apply shake to BOTH camera position AND look target (§3.8, brief #117)
     const fxOff = ctx.fx?.shakeOffset || ctx.fx?.shake?.offset || null;
@@ -229,6 +300,7 @@ export function createCameraRig(ctx) {
     orbit,
     setYaw,
     focus,
+    updateFocusTarget,
     clearFocus,
     followPlayer: clearFocus,
     setMode,

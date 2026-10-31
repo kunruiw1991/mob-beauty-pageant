@@ -329,6 +329,8 @@ INSTALL_SIM_HARNESS_JS = r"""
       pointerNulls: tracker.pointerNulls,
       firstNullFrame: tracker.firstNullFrame,
       gags: endQ.gags || [],
+      gagCamCount: (sEnd.gagCam && sEnd.gagCam.count) || 0,
+      lastGag: (sEnd.gagCam && sEnd.gagCam.lastGag) || null,
       endFrame: sEnd.frame,
       failStep: done ? null : (sEnd.quest ? sEnd.quest.step : sEnd.scene),
       cjkViolations: countCjkViolations(),
@@ -523,6 +525,7 @@ INSTALL_SIM_HARNESS_JS = r"""
       minutes: Math.round((totalMs / 60000) * 100) / 100,
       timeMs: totalMs,
       gagsByQuest,
+      gagCam: fin.gagCam || null,
       rivalAppearances: (fin.rival && fin.rival.appearances) || [],
       pointerSamples: tracker.pointerSamples,
       pointerNulls: tracker.pointerNulls,
@@ -1328,15 +1331,22 @@ def run_sim_gates_on_session(
     gags_map = ideal_session.get('gagsByQuest') or {}
     with_gag = [q for q in main_ids if len(gags_map.get(q) or []) >= 1]
     distinct_rival = sorted(set(ideal_session.get('rivalAppearances') or []))
-    f4_pass = (len(with_gag) == len(MAIN_QUESTS)) and (len(distinct_rival) >= 7)
+    gag_cam = ideal_session.get('gagCam') or {}
+    gag_cam_cnt = int(gag_cam.get('count') or 0)
+    f4_pass = (
+        len(with_gag) == len(MAIN_QUESTS)
+        and len(distinct_rival) >= 7
+        and gag_cam_cnt >= 10
+    )
     gates.append({
         'id': 'F4',
         'gate': 'F4 funny beat per quest',
-        'target': 'every quest >=1 gag (10/10); rival in >=7 distinct quests',
-        'measured': f'quests w/ gag={len(with_gag)}/10, rival quests={len(distinct_rival)}',
+        'target': 'every quest >=1 gag (10/10) + gagCam >=10; rival in >=7 distinct quests',
+        'measured': f'quests w/ gag={len(with_gag)}/10, gagCam={gag_cam_cnt}, rival quests={len(distinct_rival)}',
         'passed': f4_pass,
         'details': {
             'gagsByQuest': gags_map,
+            'gagCam': gag_cam,
             'distinctRivalQuests': distinct_rival,
         },
     })

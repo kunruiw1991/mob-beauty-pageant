@@ -9,7 +9,12 @@ import {
   canvasToTexture,
 } from './skins.js';
 import { paintChibiFace, drawMobIconCanvas, createEmoteSprite } from './faces.js';
-import { createAccessoryMesh, drawAccessoryThumb, ACCESSORY_IDS } from './accessories.js';
+import {
+  createAccessoryMesh,
+  createCustomVoxelMesh,
+  drawAccessoryThumb,
+  ACCESSORY_IDS,
+} from './accessories.js';
 import { applyActorAnim } from './anim.js';
 import { CONTESTANT_SPECS } from './contestants.js';
 import { NPC_SPECS } from './npcs.js';
@@ -315,9 +320,11 @@ export function buildChibiActor(kind, spec, opts = {}, ctx = null) {
     parts.helmet = helmetMesh;
   }
 
-  // Toggleable slapstick gag props for rival 小凯 (cake face, snowman bury, finale runway junk!)
+  // Toggleable slapstick gag props for rival 小凯 (cake face, snowman bury, 4-tier wobbling finale junk-hat tower!)
   let kaiCakeMesh = null;
+  let kaiCakeExplicit = false;
   let kaiFinaleGroup = null;
+  let kaiJunkTiers = null;
   if (spec.hasKaiProps) {
     kaiCakeMesh = createAccessoryMesh('chefHat');
     kaiCakeMesh.scale.set(0.65, 0.55, 0.35);
@@ -327,14 +334,57 @@ export function buildChibiActor(kind, spec, opts = {}, ctx = null) {
     head.add(kaiCakeMesh);
 
     kaiFinaleGroup = new THREE.Group();
+
+    // Outer-cheek frosting smudge (far on side cheek so eyes + mischievous grin stay 100% clear!)
+    const cheekDab = createCustomVoxelMesh('kaiCheekDab', (vox, b) => {
+      b.push(vox(0.15, 0.14, 0.08, 0xfff8f0, -0.43, 0.27, 0.46));
+      b.push(vox(0.10, 0.09, 0.09, 0xff8fab, -0.44, 0.29, 0.48));
+    });
+    kaiFinaleGroup.add(cheekDab);
+
+    // Tier 1 (base on head): Crooked carved jack-o'-lantern facing camera (+Z)
+    const tier1 = new THREE.Group();
+    tier1.position.set(0, 0.94, 0);
     const pHat = createAccessoryMesh('pumpkinHat');
-    pHat.position.set(-0.1, 1.0, 0);
-    pHat.rotation.z = 0.22;
-    const cSplat = createAccessoryMesh('chefHat');
-    cSplat.scale.set(0.55, 0.45, 0.30);
-    cSplat.rotation.x = Math.PI / 2;
-    cSplat.position.set(0.18, 0.38, 0.52);
-    kaiFinaleGroup.add(pHat, cSplat);
+    pHat.scale.set(0.90, 0.84, 0.90);
+    tier1.add(pHat);
+
+    // Tier 2 (hinged on pumpkin top): Sloppy snow-fort clump + dripping golden honey + frosted cake slice
+    const tier2 = new THREE.Group();
+    tier2.position.set(0.03, 0.43, 0);
+    const snowHoney = createCustomVoxelMesh('kaiJunkSnowHoney', (vox, b) => {
+      // Fluffy snow cushion
+      b.push(vox(0.66, 0.20, 0.66, 0xffffff, 0, 0.10, 0));
+      b.push(vox(0.54, 0.07, 0.54, 0xe7f5ff, -0.03, 0.22, 0.02));
+      // Dripping golden honey puddle oozing over front-right edge
+      b.push(vox(0.72, 0.09, 0.68, 0xfcc419, 0.04, 0.03, 0.02));
+      b.push(vox(0.14, 0.19, 0.12, 0xf59f00, 0.27, -0.06, 0.31));
+      b.push(vox(0.12, 0.14, 0.12, 0xf59f00, -0.23, -0.04, 0.31));
+      // Mini strawberry cake wedge stuck on left rim
+      b.push(vox(0.22, 0.14, 0.20, 0xfff0f6, -0.21, 0.25, 0.15, 0, 0, 0.18));
+      b.push(vox(0.09, 0.09, 0.09, 0xe03131, -0.23, 0.34, 0.17));
+    });
+    tier2.add(snowHoney);
+    tier1.add(tier2);
+
+    // Tier 3 (hinged on snow/honey): Jiggling green pet slime cube facing camera (+Z)
+    const tier3 = new THREE.Group();
+    tier3.position.set(-0.04, 0.24, 0);
+    const sHat = createAccessoryMesh('slimeHat');
+    sHat.scale.set(0.80, 0.74, 0.80);
+    tier3.add(sHat);
+    tier2.add(tier3);
+
+    // Tier 4 (hinged at peak): Teetering striped party cone + white pom-pom!
+    const tier4 = new THREE.Group();
+    tier4.position.set(0.03, 0.35, 0);
+    const coneHat = createAccessoryMesh('partyHat');
+    coneHat.scale.set(0.74, 0.72, 0.74);
+    tier4.add(coneHat);
+    tier3.add(tier4);
+
+    kaiFinaleGroup.add(tier1);
+    kaiJunkTiers = [tier1, tier2, tier3, tier4];
     kaiFinaleGroup.visible = !!opts.finale;
     head.add(kaiFinaleGroup);
   }
@@ -401,6 +451,7 @@ export function buildChibiActor(kind, spec, opts = {}, ctx = null) {
     baseLift: spec.baseLift || 0,
     anim: opts.anim || 'idle',
     animTime: 0,
+    finaleActive: !!opts.finale,
     phase: (nextActorUid * 1.618) % (Math.PI * 2),
     hitRadius: kind === 'slimeMob' ? 0.55 * ((opts.size || 1) === 2 ? 1.35 : 0.72) : (spec.hitRadius ?? 0.65),
     _lastFrame: -1,
@@ -411,7 +462,9 @@ export function buildChibiActor(kind, spec, opts = {}, ctx = null) {
         actor.anim = next;
         actor.animTime = 0;
       }
-      if (kaiCakeMesh && next === 'eat') kaiCakeMesh.visible = true;
+      if (kaiCakeMesh && !kaiCakeExplicit) {
+        kaiCakeMesh.visible = !actor.finaleActive && next === 'eat';
+      }
     },
 
     setAccessory(accId, slot = 0) {
@@ -464,11 +517,18 @@ export function buildChibiActor(kind, spec, opts = {}, ctx = null) {
     },
 
     setCakeFace(visible) {
+      kaiCakeExplicit = !!visible;
       if (kaiCakeMesh) kaiCakeMesh.visible = !!visible;
     },
 
     setFinaleJunk(visible) {
-      if (kaiFinaleGroup) kaiFinaleGroup.visible = !!visible;
+      const on = !!visible;
+      actor.finaleActive = on;
+      if (kaiFinaleGroup) kaiFinaleGroup.visible = on;
+      if (on && kaiCakeMesh) {
+        kaiCakeExplicit = false;
+        kaiCakeMesh.visible = false;
+      }
     },
 
     setDyedPink(pink = true) {
@@ -541,6 +601,23 @@ export function buildChibiActor(kind, spec, opts = {}, ctx = null) {
         actor._lastFrame = ctx.frame;
       }
 
+      if (kind === 'kai' && !opts.finale) {
+        const sc = ctx?.state?.scene;
+        if (sc === 'finale') {
+          actor.finaleActive = true;
+          if (kaiFinaleGroup) kaiFinaleGroup.visible = true;
+          if (kaiCakeMesh) {
+            kaiCakeExplicit = false;
+            kaiCakeMesh.visible = false;
+          }
+        } else if (sc === 'title' || sc === 'world') {
+          if (actor.finaleActive) {
+            actor.finaleActive = false;
+            if (kaiFinaleGroup) kaiFinaleGroup.visible = false;
+          }
+        }
+      }
+
       if (moveTarget) {
         const dx = moveTarget.x - group.position.x;
         const dy = moveTarget.y - group.position.y;
@@ -550,7 +627,9 @@ export function buildChibiActor(kind, spec, opts = {}, ctx = null) {
         if (dist <= step || dist < 0.02) {
           group.position.set(moveTarget.x, moveTarget.y, moveTarget.z);
           moveTarget = null;
-          if (actor.anim === 'walk' || actor.anim === 'run') actor.setAnim('idle');
+          if (actor.anim === 'walk' || actor.anim === 'run') {
+            actor.setAnim(kind === 'kai' && actor.finaleActive ? 'strut' : 'idle');
+          }
         } else {
           group.position.x += (dx / dist) * step;
           group.position.z += (dz / dist) * step;
@@ -559,16 +638,48 @@ export function buildChibiActor(kind, spec, opts = {}, ctx = null) {
         }
       }
 
+      // Lock 小凯 facing directly toward the runway camera throughout finale (#155 C2)
+      const kaiInFinale = kind === 'kai' && (actor.finaleActive || ctx?.state?.scene === 'finale');
+      if (kaiInFinale) {
+        const camPos = ctx?.camera?.position || ctx?.cam?.camera?.position;
+        if (camPos) {
+          const cdx = camPos.x - group.position.x;
+          const cdz = camPos.z - group.position.z;
+          group.rotation.y = cdx * cdx + cdz * cdz > 1e-4 ? Math.atan2(cdx, cdz) : 0;
+        } else {
+          group.rotation.y = 0;
+        }
+      }
+
       applyActorAnim(actor, dt);
+
+      // Cascading 4-tier spring/pendulum wobble on 小凯's finale junk-hat tower (#155 C2)
+      if (kaiFinaleGroup && kaiFinaleGroup.visible && kaiJunkTiers) {
+        const wt = actor.animTime * 8.6 + 0.95;
+        const [t1, t2, t3, t4] = kaiJunkTiers;
+        t1.rotation.z = -0.10 + Math.sin(wt - 0.35) * 0.21;
+        t1.rotation.x = Math.cos(wt * 0.85 - 0.20) * 0.10;
+        t2.rotation.z = 0.09 + Math.sin(wt - 0.95) * 0.27;
+        t2.rotation.x = Math.sin(wt * 1.10 - 0.65) * 0.14;
+        t2.position.x = 0.03 + Math.sin(wt - 0.95) * 0.05;
+        t3.rotation.z = -0.08 + Math.sin(wt - 1.55) * 0.33;
+        t3.rotation.x = Math.cos(wt * 1.20 - 1.10) * 0.16;
+        t3.position.y = 0.24 + Math.abs(Math.sin(wt * 1.6)) * 0.05;
+        t4.rotation.z = 0.12 + Math.sin(wt - 2.15) * 0.38;
+        t4.rotation.x = Math.sin(wt * 1.30 - 1.60) * 0.18;
+      }
+
       if (spec.onUpdate) spec.onUpdate(actor, dt);
 
       if (emoteSprite) {
-        emoteSprite.position.y = topHeight + 0.65 + Math.sin(actor.animTime * 5) * 0.06;
+        const extraH = kaiFinaleGroup && kaiFinaleGroup.visible ? 1.25 : 0;
+        emoteSprite.position.y = topHeight + extraH + 0.65 + Math.sin(actor.animTime * 5) * 0.06;
       }
       const lift = Math.max(0, rig.position.y);
       const sScale = Math.max(0.35, 1 - lift * 0.42) * (spec.shadowRadius ?? 0.52) * 2;
       shadow.scale.set(sScale, 1, sScale);
     },
+    _getEmoteSprite: () => emoteSprite,
   };
 
   return actor;
@@ -625,6 +736,29 @@ export function createChars(ctx = {}) {
       for (const a of actors) {
         if (a.group.parent && a.group.visible) {
           a.update(dt);
+          // Runs after rival.update(dt): keep 小凯 facing camera & speech bubble cleanly above the 4-tier wobbling hat stack!
+          if (a.kind === 'kai' && (a.finaleActive || ctx?.state?.scene === 'finale')) {
+            const camPos = ctx?.camera?.position || ctx?.cam?.camera?.position;
+            if (camPos) {
+              const cdx = camPos.x - a.group.position.x;
+              const cdz = camPos.z - a.group.position.z;
+              a.group.rotation.y = cdx * cdx + cdz * cdz > 1e-4 ? Math.atan2(cdx, cdz) : 0;
+            } else {
+              a.group.rotation.y = 0;
+            }
+            for (const ch of a.group.children) {
+              if (ch === a.rig || ch === a.parts?.shadow || ch === a.parts?.poofRing) continue;
+              if (ch.isSprite && ch.visible && ch !== a._getEmoteSprite?.()) {
+                ch.position.y = 3.98 + Math.sin(a.animTime * 5.5) * 0.07;
+              } else if (ch.isGroup && ch.visible) {
+                for (const sub of ch.children) {
+                  if (sub.isMesh && (sub.position.y > 2.1 || (sub.position.y > 1.65 && sub.position.z > 0.4))) {
+                    sub.visible = false;
+                  }
+                }
+              }
+            }
+          }
         }
       }
     },

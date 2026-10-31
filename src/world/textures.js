@@ -544,11 +544,34 @@ export function createTextures() {
     rect(0, 11, 16, 2, 0x8e9396);
   });
 
-  // End & Nether blocks
-  alloc('end_stone', ({ fillNoise, setPx, rnd }) => {
-    fillNoise(0xdfe3a3, 11);
-    for (let i = 0; i < 24; i++) {
-      setPx((rnd() * 16) | 0, (rnd() * 16) | 0, 192, 198, 138);
+  // End & Nether blocks — MC-faithful pale creamy yellow (#dedb9c) organic porous End Stone noise
+  alloc('end_stone', ({ setPx, rnd }) => {
+    // Seamless 16x16 organic cellular noise around #dedb9c (222, 219, 156) — zero grid seams!
+    const pits = [
+      [2, 2, 2.1], [9, 3, 2.4], [14, 2, 1.8],
+      [5, 7, 2.3], [12, 8, 2.2], [1, 10, 1.9],
+      [7, 13, 2.4], [13, 14, 2.0], [3, 14, 1.7],
+    ];
+    for (let y = 0; y < 16; y++) {
+      for (let x = 0; x < 16; x++) {
+        let minD = 99;
+        for (const [px, py, pr] of pits) {
+          for (const ox of [-16, 0, 16]) {
+            for (const oy of [-16, 0, 16]) {
+              const d = Math.hypot(x - (px + ox), y - (py + oy)) / pr;
+              if (d < minD) minD = d;
+            }
+          }
+        }
+        const jitter = (rnd() - 0.5) * 12;
+        let r = 224, gr = 221, b = 158; // #e0dd9e / #dedb9c
+        if (minD < 0.62) {
+          r = 196; gr = 192; b = 132; // soft porous pit
+        } else if (minD > 0.98) {
+          r = 237; gr = 234; b = 174; // pale ridge highlight
+        }
+        setPx(x, y, r + jitter, gr + jitter, b + jitter * 0.8);
+      }
     }
   });
   alloc('end_portal_frame_top', ({ rect }) => {

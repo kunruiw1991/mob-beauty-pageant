@@ -34,7 +34,7 @@ const END_CAGE_BARS = { x: 160.5, y: 8, z: 40.5 };
 const END_CAGE_FRONT = { x: 159.2, y: 8, z: 40.5 };
 const END_ENDER_INSIDE = { x: 162.2, y: 8, z: 40.5 };
 
-const HUB_SHRINE_CHASE_START = { x: 22.5, y: 8, z: 27.5 };
+const HUB_SHRINE_CHASE_START = { x: 20.5, y: 8, z: 20.5 };
 const HUB_KAI_HOUSE_TRAIL = { x: 23.5, y: 8, z: 45.5 };
 
 const PRISON_OUTER_BANK = { x: 24.5, y: 8, z: 66.5 };
@@ -230,7 +230,7 @@ function setupEndCagePhase(ctx) {
     attachToScene(ctx, enderContestant.group);
   }
 
-  // 4 End Crystal Seals around the End Island ring (2 taps each, clockwise)
+  // 4 End Crystal Seals around the End Island ring (3 taps each, clockwise)
   for (const s of endSeals) s.destroy();
   endSeals.length = 0;
   END_SEAL_SPOTS.forEach((sp, idx) => {
@@ -610,7 +610,7 @@ const qEnder = {
         enderContestant.group.position.set(kp.x + 0.45, kp.y + 0.35, kp.z - 0.35);
         enderContestant.setEmote('!');
       }
-      if (cutsceneElapsed >= 3.4) {
+      if (cutsceneElapsed >= 4.2) {
         openPortalChasePhase(ctx);
       }
       return;
@@ -877,20 +877,32 @@ const qEnder = {
   },
 
   objective() {
-    const stageMap = {
-      to_end: 0,
-      end_seals: 0,
-      end_cage: 0,
-      steal_cutscene: 1,
-      chase_portal: 1,
-      chase_house: 1,
-      chase_prison: 1,
-      stones: 1,
-      cobwebs: 2,
-      yard: 3,
-      rescue: 4,
-    };
-    return { icon: '🔮', have: stageMap[phase] ?? 0, need: 4 };
+    if (phase === 'to_end' || phase === 'end_seals') {
+      return { icon: '🔮', have: Math.min(sealIdx, END_SEAL_SPOTS.length), need: END_SEAL_SPOTS.length };
+    }
+    if (phase === 'end_cage') {
+      return { icon: '🗝️', have: Math.min(cageBreakable?.hits ?? 0, 3), need: 3 };
+    }
+    if (phase === 'steal_cutscene' || phase === 'chase_portal' || phase === 'chase_house' || phase === 'chase_prison') {
+      const step = phase === 'chase_house' ? 1 : phase === 'chase_prison' ? 2 : 0;
+      return { icon: '👣', have: step, need: 3 };
+    }
+    if (phase === 'stones') {
+      return { icon: '🟣', have: Math.min(stoneStep, 3), need: 3 };
+    }
+    if (phase === 'cobwebs') {
+      const doneWebs = (cobweb0?.broken ? 1 : 0) + (cobweb1?.broken ? 1 : 0);
+      return { icon: '🕸️', have: doneWebs, need: 2 };
+    }
+    if (phase === 'yard' && padlockIdx === 0) {
+      return { icon: '🔑', have: 0, need: 1 };
+    }
+    const doorHits = phase === 'rescue' ? 3 : Math.min(cellDoorBreakable?.hits ?? 0, 3);
+    return { icon: '🚪', have: doorHits, need: 3 };
+  },
+
+  introPos() {
+    return { ...END_ENDER_INSIDE };
   },
 
   action() {

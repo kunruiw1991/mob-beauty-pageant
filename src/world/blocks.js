@@ -142,7 +142,7 @@ const DEFS = [
   [B.LAVA, 'lava', 0xf55d14, { solid: true, transparent: false, walkable: false, breakable: false, pickable: true, emissive: true }],
   [B.COBWEB, 'cobweb', 0xebeff2, { solid: false, transparent: true, walkable: false, breakable: true, pickable: true, pass: 'cutout', shape: 'cross', blocksWalk: false }],
   [B.IRON_BARS, 'iron_bars', 0xa2a6a8, { solid: true, transparent: true, walkable: false, breakable: true, pass: 'cutout', shape: 'bars' }],
-  [B.END_STONE, 'end_stone', 0xdfe3a3, { solid: true, transparent: false, walkable: true, breakable: false }],
+  [B.END_STONE, 'end_stone', 0xdedb9c, { solid: true, transparent: false, walkable: true, breakable: false }],
   [B.END_PORTAL_FRAME, 'end_portal_frame', 0x457d6a, { solid: true, transparent: false, walkable: true, breakable: false }],
   [B.NETHERRACK, 'netherrack', 0x6f2828, { solid: true, transparent: false, walkable: true, breakable: true }],
   [B.NETHER_BRICK, 'nether_brick', 0x33181e, { solid: true, transparent: false, walkable: true, breakable: false }],

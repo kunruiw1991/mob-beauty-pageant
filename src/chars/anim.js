@@ -1,5 +1,5 @@
 export const ANIMS = [
-  'idle', 'walk', 'run', 'wave', 'cheer', 'pose', 'shrug', 'flex', 'pushup',
+  'idle', 'walk', 'run', 'strut', 'wave', 'cheer', 'pose', 'shrug', 'flex', 'pushup',
   'sad', 'happy', 'sneak', 'throw', 'dig', 'hop', 'teleport', 'spawn',
   'eat', 'sneeze', 'faint', 'stuck', 'cry', 'dance',
 ];
@@ -9,7 +9,6 @@ const ALIAS = {
   flail: 'stuck',
   laugh: 'happy',
   clap: 'cheer',
-  strut: 'pose',
   crouch: 'sneak',
 };
 
@@ -40,8 +39,11 @@ export function resetRigPose(actor) {
 export function applyActorAnim(actor, dt) {
   actor.animTime += dt;
   const t = actor.animTime;
-  const name = normalizeAnimName(actor.anim);
   const isKai = actor.kind === 'kai';
+  let name = normalizeAnimName(actor.anim);
+  if (isKai && actor.finaleActive && (name === 'walk' || name === 'run' || name === 'idle')) {
+    name = 'strut';
+  }
   const slap = isKai ? 1.65 : 1.0;
 
   resetRigPose(actor);
@@ -146,6 +148,62 @@ export function applyActorAnim(actor, dt) {
         head.rotation.x = isRun ? 0.08 : 0;
       }
       if (isKai && isRun && body) body.rotation.x = -0.14; // goofy lean-back cartoon sprint
+      break;
+    }
+
+    case 'strut': {
+      // Exaggerated slapstick high-fashion runway catwalk strut!
+      const freq = isKai ? 8.6 : 6.8;
+      // Non-zero initial phase (0.95 rad) ensures frame-0 screenshots already show cocked hips & wide arm swing!
+      const ph = t * freq + 0.95;
+      const s = Math.sin(ph);
+      const c = Math.cos(ph);
+      const amp = isKai ? 1.0 : 0.68;
+
+      // 1. Sassy lateral pelvis sway + bouncy catwalk pop + squash/stretch
+      rig.position.x = s * 0.20 * amp;
+      rig.position.y = Math.abs(c) * 0.14 * (isKai ? 1.15 : 0.8);
+      const sy = 1 + (Math.abs(c) - 0.5) * 0.09;
+      rig.scale.set(1 / Math.sqrt(sy), sy, 1 / Math.sqrt(sy));
+
+      // 2. Exaggerated hip/ribcage tilt + counter-rotated swagger shoulders
+      if (body) {
+        body.position.x = (body.userData.restPos?.x || 0) + s * 0.08 * amp;
+        body.rotation.z = -s * 0.31 * amp;
+        body.rotation.y = s * 0.38 * amp;
+        body.rotation.x = -0.10 * amp;
+      }
+
+      // 3. Cross-stepping catwalk legs
+      if (legL) {
+        legL.rotation.x = s * 0.88 * amp;
+        legL.rotation.z = -s * 0.12 * amp - 0.06;
+        legL.position.x = (legL.userData.restPos?.x || 0) + s * 0.05 * amp;
+      }
+      if (legR) {
+        legR.rotation.x = -s * 0.88 * amp;
+        legR.rotation.z = -s * 0.12 * amp + 0.06;
+        legR.position.x = (legR.userData.restPos?.x || 0) + s * 0.05 * amp;
+      }
+
+      // 4. Huge flamboyant runway arm swings + flared elbows (clearly readable from front camera!)
+      if (armL) {
+        armL.rotation.x = -s * 1.32 * amp - 0.24;
+        armL.rotation.z = 0.46 + Math.max(0, s) * 0.52 * amp;
+        armL.rotation.y = s * 0.26;
+      }
+      if (armR) {
+        armR.rotation.x = s * 1.32 * amp - 0.24;
+        armR.rotation.z = -0.46 - Math.max(0, -s) * 0.52 * amp;
+        armR.rotation.y = s * 0.26;
+      }
+
+      // 5. Smug chin-up head attitude while keeping mischievous grin facing the camera
+      if (head) {
+        head.rotation.y = -s * 0.15 * amp;
+        head.rotation.z = s * 0.17 * amp;
+        head.rotation.x = -0.08 + Math.sin(ph * 2) * 0.05;
+      }
       break;
     }
 

@@ -596,8 +596,17 @@ const qWither = {
   },
 
   objective() {
-    const totalDone = skullsPopped + sandDug + slotsPlaced;
-    return { icon: '💀', have: Math.min(totalDone, 14), need: 14 };
+    if (phase === 'to_nether' || phase === 'skulls') {
+      return { icon: '💀', have: Math.min(skullsPopped, 3), need: 3 };
+    }
+    if (phase === 'soulsand') {
+      return { icon: '🟫', have: Math.min(sandDug, 4), need: 4 };
+    }
+    return { icon: '🏗', have: Math.min(slotsPlaced, 7), need: 7 };
+  },
+
+  introPos() {
+    return { x: ALTAR_BASE.x, y: ALTAR_BASE.y + 1.0, z: ALTAR_BASE.z };
   },
 
   action() {

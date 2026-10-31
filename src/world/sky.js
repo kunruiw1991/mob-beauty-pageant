@@ -17,17 +17,17 @@ const PALETTES = {
     stars: false,
   },
   end: {
-    bg: 0x10061e,
-    zenith: [0x070210, 0x18092c, 0x2c1148],
-    fogColor: 0x1a0b2e,
-    fogNear: 42,
-    fogFar: 105,
-    hemiSky: 0xaa82e0,
-    hemiGround: 0x3b2c4a,
-    hemiInt: 0.86,
-    dirColor: 0xebd9ff,
-    dirInt: 0.95,
-    dirPos: [168, 56, 72],
+    bg: 0x0d041c,
+    zenith: [0x06010f, 0x190733, 0x2c0f52],
+    fogColor: 0x16062c,
+    fogNear: 58,
+    fogFar: 140,
+    hemiSky: 0xfffdf0,
+    hemiGround: 0xa6a176,
+    hemiInt: 0.88,
+    dirColor: 0xfffef4,
+    dirInt: 0.96,
+    dirPos: [164, 68, 66],
     clouds: false,
     stars: true,
   },
@@ -70,25 +70,32 @@ function makeSkyTexture(stops) {
 
 function makeStarSkyTexture() {
   const c = document.createElement('canvas');
-  c.width = 256;
-  c.height = 128;
+  c.width = 512;
+  c.height = 256;
   const g = c.getContext('2d');
-  const grad = g.createLinearGradient(0, 0, 0, 128);
-  grad.addColorStop(0.0, '#070210');
-  grad.addColorStop(0.55, '#16082b');
-  grad.addColorStop(1.0, '#291046');
+  const grad = g.createLinearGradient(0, 0, 0, 256);
+  grad.addColorStop(0.0, '#070212');
+  grad.addColorStop(0.38, '#190734');
+  grad.addColorStop(0.68, '#2b0f52');
+  grad.addColorStop(1.0, '#120426');
   g.fillStyle = grad;
-  g.fillRect(0, 0, 256, 128);
-  // Deterministic crisp pixel stars for End void
+  g.fillRect(0, 0, 512, 256);
   let s = 0x51a7e1;
   const rnd = () => {
     s = (s * 1664525 + 1013904223) >>> 0;
     return s / 4294967296;
   };
-  for (let i = 0; i < 320; i++) {
-    const x = Math.floor(rnd() * 254) + 1;
-    const y = Math.floor(rnd() * 96) + 8;
-    g.fillStyle = rnd() > 0.4 ? '#f0d9ff' : '#a874ff';
+  for (let i = 0; i < 36; i++) {
+    const nx = Math.floor(rnd() * 488);
+    const ny = Math.floor(rnd() * 236) + 8;
+    g.fillStyle = i % 2 === 0 ? 'rgba(147, 51, 234, 0.16)' : 'rgba(192, 132, 252, 0.12)';
+    g.fillRect(nx, ny, 14 + Math.floor(rnd() * 28), 4 + Math.floor(rnd() * 10));
+  }
+  for (let i = 0; i < 950; i++) {
+    const x = Math.floor(rnd() * 508) + 2;
+    const y = Math.floor(rnd() * 246) + 5;
+    const roll = rnd();
+    g.fillStyle = roll > 0.55 ? '#faf5ff' : roll > 0.2 ? '#e879f9' : '#a855f7';
     g.fillRect(x, y, 1, 1);
   }
   const tex = new THREE.CanvasTexture(c);
@@ -203,24 +210,28 @@ export function createSky(ctx) {
 
     clouds.visible = p.clouds;
     if (ambient) {
-      ambient.intensity = currentArea === 'hub' ? 0.55 : currentArea === 'end' ? 0.48 : 0.46;
-      ambient.color.setHex(currentArea === 'nether' ? 0xffcfc2 : currentArea === 'end' ? 0xe5d4ff : 0xffffff);
+      ambient.intensity = currentArea === 'hub' ? 0.55 : currentArea === 'end' ? 0.84 : 0.46;
+      ambient.color.setHex(currentArea === 'nether' ? 0xffcfc2 : currentArea === 'end' ? 0xfffef5 : 0xffffff);
     }
     hemi.color.setHex(p.hemiSky);
     hemi.groundColor.setHex(p.hemiGround);
-    hemi.intensity = externalLights ? p.hemiInt * 0.62 : p.hemiInt;
+    hemi.intensity = externalLights ? (currentArea === 'end' ? 0.68 : p.hemiInt * 0.62) : p.hemiInt;
     sun.color.setHex(p.dirColor);
-    sun.intensity = externalLights ? p.dirInt * 0.85 : p.dirInt;
+    sun.intensity = externalLights ? (currentArea === 'end' ? 0.9 : p.dirInt * 0.85) : p.dirInt;
     sun.position.set(p.dirPos[0], p.dirPos[1], p.dirPos[2]);
     if (sun.target) {
+      if (!sun.target.parent && ctx?.scene) {
+        ctx.scene.add(sun.target);
+      }
       sun.target.position.set(centerX, 8, centerZ);
+      sun.target.updateMatrixWorld();
     }
 
     if (ctx?.scene) {
       ctx.scene.background = new THREE.Color(p.bg);
       if (ctx.scene.fog && ctx.scene.fog.isFogExp2) {
         ctx.scene.fog.color.setHex(p.fogColor);
-        ctx.scene.fog.density = currentArea === 'hub' ? 0.0052 : currentArea === 'end' ? 0.011 : 0.014;
+        ctx.scene.fog.density = currentArea === 'hub' ? 0.0052 : currentArea === 'end' ? 0.0035 : 0.014;
       } else if (ctx.scene.fog && ctx.scene.fog.isFog) {
         ctx.scene.fog.color.setHex(p.fogColor);
         ctx.scene.fog.near = p.fogNear;

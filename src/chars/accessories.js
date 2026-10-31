@@ -217,6 +217,19 @@ export function createAccessoryMesh(accId) {
   return mesh;
 }
 
+export function createCustomVoxelMesh(cacheKey, buildBoxesFn) {
+  let geo = accGeoCache.get(cacheKey);
+  if (!geo) {
+    const boxes = [];
+    buildBoxesFn(vox, boxes);
+    geo = mergeGeometries(boxes);
+    accGeoCache.set(cacheKey, geo);
+  }
+  const mesh = new THREE.Mesh(geo, getAccMat());
+  mesh.name = cacheKey;
+  return mesh;
+}
+
 export function drawAccessoryThumb(accId, size = 96) {
   const c = createCanvas(size, size);
   const g = c.getContext('2d');

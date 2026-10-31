@@ -613,15 +613,68 @@ export function buildWorldLayout(voxels) {
 
   // ============================================================================
   // 11. END POCKET: x in [128,176), z in [16,64), centre (152, 8, 40)
+  // Scalloped MC End archipelago lobes + wide causeways so black-purple starry void shows right inside 52° follow cam!
   // ============================================================================
+  const endLobes = [
+    [152, 41, 7.6],   // central hub plaza (hosts Endermen + egg hop spots)
+    [149, 47.5, 4.4], // SW wander terrace
+    [155.5, 46, 4.4], // SE wander terrace
+    [148.5, 34, 4.2], // NW wander terrace
+    [156, 33, 4.0],   // NE wander terrace
+    [152, 56, 4.8],   // arrive & exit portal isle
+    [141, 39, 5.2],   // big enderman cage isle
+    [162, 40, 4.5],   // small cage isle
+    [139.5, 48.5, 3.6], [140.5, 30.5, 3.6], [163.5, 30.5, 3.6], [164.5, 47.5, 3.6], // 4 chorus seals
+    [138, 28, 2.8], [166, 28, 2.8], [136, 48, 2.8], [167, 48, 2.8], [144, 23, 3.0], [152, 26, 4.2], // 6 pillars + stairs
+  ];
+  const endCauseways = [
+    [152, 56, 152, 26, 2.8],     // S->N main spine
+    [141, 39, 162, 40, 2.6],     // W->E cage bridge
+    [139.5, 48.5, 149, 45, 2.3], // SW seal causeway
+    [140.5, 30.5, 149, 34, 2.3], // NW seal causeway
+    [163.5, 30.5, 156, 34, 2.3], // NE seal causeway
+    [164.5, 47.5, 156, 45, 2.3], // SE seal causeway
+    [144, 23, 151, 26, 2.0],     // N pillar spur
+  ];
+  function distToSegment(px, pz, ax, az, bx, bz) {
+    const vx = bx - ax, vz = bz - az;
+    const len2 = vx * vx + vz * vz;
+    const t = len2 > 0 ? Math.max(0, Math.min(1, ((px - ax) * vx + (pz - az) * vz) / len2)) : 0;
+    return Math.hypot(px - (ax + vx * t), pz - (az + vz * t));
+  }
   for (let x = 131; x <= 172; x++) {
     for (let z = 19; z <= 61; z++) {
-      const dx = (x - 152) / 20;
-      const dz = (z - 40) / 20;
-      const d = Math.hypot(dx, dz) + Math.sin(x * 0.25) * 0.05 + Math.cos(z * 0.25) * 0.05;
-      if (d <= 1.0) {
-        const bot = Math.max(4, Math.floor(4 + d * 3));
-        fill(x, bot, z, x, 7, z, B.END_STONE);
+      let minNorm = 99;
+      for (const [lx, lz, lr] of endLobes) {
+        const nd = Math.hypot(x - lx, z - lz) / lr;
+        if (nd < minNorm) minNorm = nd;
+      }
+      for (const [ax, az, bx, bz, hw] of endCauseways) {
+        const nd = distToSegment(x, z, ax, az, bx, bz) / hw;
+        if (nd < minNorm) minNorm = nd;
+      }
+      const jag = 0.06 * Math.sin(x * 0.9 + z * 0.7);
+      if (minNorm + jag <= 1.0) {
+        const depth = minNorm < 0.55 ? 4 : minNorm < 0.8 ? 5 : 6;
+        fill(x, depth, z, x, 7, z, B.END_STONE);
+      }
+    }
+  }
+  // Floating decorative End-stone mini islets out in the starry void (visible around perimeter at 52° pitch!)
+  const voidIslets = [
+    [131, 6, 22, 2],
+    [172, 6, 22, 2],
+    [131, 5, 35, 1],
+    [172, 5, 38, 1],
+    [143, 6, 58, 2],
+    [161, 6, 58, 2],
+  ];
+  for (const [ix, iy, iz, ir] of voidIslets) {
+    for (let ox = -ir; ox <= ir; ox++) {
+      for (let oz = -ir; oz <= ir; oz++) {
+        if (Math.hypot(ox, oz) <= ir + 0.3 && get(ix + ox, 7, iz + oz) === B.AIR) {
+          fill(ix + ox, iy - 1, iz + oz, ix + ox, iy, iz + oz, B.END_STONE);
+        }
       }
     }
   }

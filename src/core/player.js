@@ -405,10 +405,14 @@ export function createPlayer(ctx) {
     get actor() {
       return ensureActor();
     },
+    get group() {
+      return ensureActor()?.group || null;
+    },
     ensureActor,
     setPosition,
     walkTo,
     stop,
+    isMoving: () => Boolean(moving),
     setSneak,
     setSneaking: setSneak,
     isSneaking,

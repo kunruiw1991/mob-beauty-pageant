@@ -418,6 +418,63 @@ body > canvas {
   font-weight: 900;
 }
 
+/* Off-screen beacon arrow (#149 N3: >= 72x72 px, contestant face + bouncing arrow) */
+.hud-beacon-btn {
+  position: fixed;
+  width: 80px;
+  height: 80px;
+  min-width: 76px;
+  min-height: 76px;
+  padding: 0;
+  background-color: #2b2d42;
+  border: 4px solid #ffe64d;
+  box-shadow: 0 5px 0 #14151c, 0 0 0 2px #1b1c24;
+  overflow: visible;
+  z-index: 6;
+}
+
+.hud-beacon-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  animation: beaconInnerBounce 0.85s ease-in-out infinite;
+}
+
+.hud-beacon-face {
+  width: 50px;
+  height: 50px;
+  border: 2px solid #1b1c24;
+  image-rendering: pixelated;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+
+.hud-beacon-arrow-pivot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  inset: 0;
+  pointer-events: none;
+  transform-origin: 50% 50%;
+}
+
+.hud-beacon-arrow-svg {
+  position: absolute;
+  right: -20px;
+  top: 50%;
+  width: 32px;
+  height: 32px;
+  transform: translateY(-50%);
+  filter: drop-shadow(0 2px 0 #14151c);
+  pointer-events: none;
+}
+
 /* ==========================================================================
    Booth / Runway Overlay (§8.1)
    ========================================================================== */
@@ -744,7 +801,7 @@ body > canvas {
   overflow: hidden;
 }
 
-/* Placed cards >= 72x72 px; Tray polaroid >= 96x96 px */
+/* Placed cards >= 72x72 px (96x108 px on desktop when space allows); Tray polaroid >= 98x98 px */
 .board-card {
   pointer-events: auto;
   touch-action: none;
@@ -757,44 +814,63 @@ body > canvas {
   flex-direction: column;
   align-items: center;
   justify-content: space-between;
-  padding: 3px;
+  padding: 4px;
   flex: 0 0 auto;
 }
 
 .placed-card {
-  width: 74px;
-  height: 74px;
-  min-width: 72px;
-  min-height: 72px;
+  width: 96px;
+  height: 108px;
+  min-width: 74px;
+  min-height: 74px;
 }
 
 .placed-card .board-card-img {
-  width: 50px;
-  height: 48px;
+  width: 82px;
+  height: 76px;
   object-fit: cover;
   image-rendering: pixelated;
   pointer-events: none;
+  border: 1px solid rgba(27, 28, 36, 0.35);
+}
+
+.tier-row-cards.is-crowded {
+  gap: 4px;
+}
+
+.tier-row-cards.is-crowded .placed-card {
+  width: 74px;
+  height: 84px;
+  min-width: 72px;
+  min-height: 72px;
+  padding: 3px;
+}
+
+.tier-row-cards.is-crowded .placed-card .board-card-img {
+  width: 60px;
+  height: 56px;
 }
 
 .tray-card {
-  width: 120px;
-  height: 128px;
+  width: 128px;
+  height: 138px;
   min-width: 98px;
   min-height: 98px;
   padding: 6px 6px 5px;
 }
 
 .tray-card .board-card-img {
-  width: 92px;
-  height: 88px;
+  width: 102px;
+  height: 96px;
   object-fit: cover;
   image-rendering: pixelated;
   pointer-events: none;
+  border: 1px solid rgba(27, 28, 36, 0.35);
 }
 
 .board-card-label {
-  font-size: 13px;
-  line-height: 1.05;
+  font-size: 14px;
+  line-height: 1.08;
   font-weight: 900;
   color: #1b1c24;
   white-space: nowrap;
@@ -1176,8 +1252,8 @@ body > canvas {
 }
 
 .final-tier-label {
-  width: 112px;
-  flex: 0 0 112px;
+  width: 106px;
+  flex: 0 0 106px;
   align-self: stretch;
   display: flex;
   align-items: center;
@@ -1194,47 +1270,51 @@ body > canvas {
 .final-tier-cards {
   flex: 1 1 auto;
   min-width: 0;
+  align-self: stretch;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   align-content: center;
-  gap: 4px;
-  padding: 2px 5px;
+  gap: 6px;
+  padding: 3px 6px;
   overflow: hidden;
 }
 
 .final-mini-card {
-  width: 52px;
-  height: 56px;
-  background: #f8f6f0;
-  border: 2px solid #1b1c24;
+  width: 104px;
+  height: 118px;
+  background-color: #f8f6f0;
+  background-size: 32px 32px;
+  border: 3px solid #1b1c24;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.42);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: space-between;
-  padding: 2px;
+  padding: 4px;
   flex: 0 0 auto;
 }
 
 .final-mini-card img {
-  width: 42px;
-  height: 35px;
+  width: 88px;
+  height: 82px;
   object-fit: cover;
   image-rendering: pixelated;
+  border: 1px solid rgba(27, 28, 36, 0.3);
 }
 
 .final-mini-card span {
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 900;
   color: #1b1c24;
-  line-height: 1.18;
+  line-height: 1.12;
   white-space: nowrap;
 }
 
 .final-summary-panel {
   pointer-events: auto;
-  width: 248px;
-  flex: 0 0 248px;
+  width: 232px;
+  flex: 0 0 232px;
   padding: 12px;
   border: 5px solid var(--px-border);
   background-size: 48px 48px;
@@ -1395,6 +1475,31 @@ body > canvas {
 
   .tier-icon {
     font-size: 19px;
+  }
+
+  .tier-row-cards {
+    flex-wrap: wrap;
+    gap: 5px;
+    padding: 2px 6px;
+  }
+
+  .placed-card,
+  .tier-row-cards.is-crowded .placed-card {
+    width: 74px;
+    height: 78px;
+    min-width: 72px;
+    min-height: 72px;
+    padding: 3px;
+  }
+
+  .placed-card .board-card-img,
+  .tier-row-cards.is-crowded .placed-card .board-card-img {
+    width: 56px;
+    height: 50px;
+  }
+
+  .board-card-label {
+    font-size: 12px;
   }
 
   .board-side-panel {
@@ -1565,45 +1670,58 @@ body > canvas {
     height: 96px;
   }
 
-  /* Tier Board in 390px height: 5 rows x 73px + 4x1px gap + 8px pad = 377px <= 390px! */
+  /* Tier Board in 390px height: 5 rows x 74px + 4x1px gap + 10px frame + 4px shell = 388px <= 390px! */
   .board-shell {
     flex-direction: row;
     gap: 8px;
     padding:
-      4px
+      2px
       max(10px, var(--safe-r))
-      4px
+      2px
       max(10px, var(--safe-l));
   }
 
   .board-wall-frame {
-    gap: 2px;
-    padding: 4px;
-    border-width: 4px;
+    gap: 1px;
+    padding: 2px;
+    border-width: 3px;
   }
 
   .tier-row {
-    min-height: 70px;
-    border-width: 2px;
+    min-height: 74px;
+    border-width: 1px;
+  }
+
+  .tier-row-cards {
+    padding: 0 6px;
+    gap: 5px;
   }
 
   .tier-label-tile {
-    width: 102px;
-    flex: 0 0 102px;
+    width: 96px;
+    flex: 0 0 96px;
     font-size: 17px;
   }
 
-  .placed-card {
+  .placed-card,
+  .tier-row-cards.is-crowded .placed-card {
     width: 72px;
-    height: 70px;
+    height: 72px;
     min-width: 72px;
-    min-height: 69px;
+    min-height: 72px;
     padding: 2px;
+    border-width: 2px;
   }
 
-  .placed-card .board-card-img {
-    width: 48px;
-    height: 44px;
+  .placed-card .board-card-img,
+  .tier-row-cards.is-crowded .placed-card .board-card-img {
+    width: 50px;
+    height: 46px;
+  }
+
+  .board-card-label {
+    font-size: 12px;
+    line-height: 1.05;
   }
 
   .board-side-panel {
@@ -1787,4 +1905,13 @@ body > canvas {
 @keyframes irisOpen {
   0%   { opacity: 1; }
   100% { opacity: 0; }
+}
+
+@keyframes beaconInnerBounce {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(var(--beacon-dx, 4px), var(--beacon-dy, 0px), 0) scale(1.06);
+  }
 }

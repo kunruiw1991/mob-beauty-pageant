@@ -25,17 +25,17 @@ const MERCY_TOTAL_PATS = 8; // #143: off-beat pats give 0 until mercy (8 pats)
 
 // Verified walkable clearing spots around (26.5, 8, 58.5)
 const BACKOFF_SPOTS = [
-  { x: 28.5, y: 8, z: 57.5 }, // Initial spot (player starts at 34.5, 8, 54.5)
-  { x: 25.5, y: 8, z: 60.5 }, // Backoff hop 1
-  { x: 24.5, y: 8, z: 56.5 }, // Backoff hop 2
+  { x: 29.5, y: 8, z: 56.5 }, // Initial spot (player starts at 35.5, 8, 52.5)
+  { x: 23.5, y: 8, z: 60.5 }, // Backoff hop 1
+  { x: 28.5, y: 8, z: 63.5 }, // Backoff hop 2
 ];
 
 const SHUFFLE_SPOTS = [
-  { x: 27.5, y: 8, z: 55.5 },
-  { x: 29.5, y: 8, z: 60.5 },
-  { x: 25.5, y: 8, z: 60.5 },
-  { x: 24.5, y: 8, z: 56.5 },
-  { x: 28.5, y: 8, z: 57.5 },
+  { x: 22.5, y: 8, z: 57.5 },
+  { x: 30.5, y: 8, z: 55.5 },
+  { x: 23.5, y: 8, z: 60.5 },
+  { x: 31.5, y: 8, z: 60.5 },
+  { x: 25.5, y: 8, z: 56.5 },
 ];
 
 let creeperActor = null;
@@ -168,7 +168,7 @@ function triggerHappyConfettiBoom(ctx) {
 function isFlashWindowOpen() {
   if (backoffHops < 2 || hopArc || patCooldown > 0 || finishing) return false;
   const phase = (fuseClock % FUSE_PERIOD) / FUSE_PERIOD;
-  return phase >= 0.62;
+  return phase >= 0.7;
 }
 
 const qCreeper = {
@@ -308,7 +308,7 @@ const qCreeper = {
       backoffHops += 1;
       creeperActor?.setEmote?.('!');
       playSfx(ctx, 'hiss', { pos: centerPos, vol: 0.4, pitch: 1.25 });
-      startCreeperHop(ctx, BACKOFF_SPOTS[backoffHops], 0.58);
+      startCreeperHop(ctx, BACKOFF_SPOTS[backoffHops], 0.65);
       creeperActor?.update?.(dt);
       return;
     }
@@ -318,7 +318,11 @@ const qCreeper = {
     }
 
     if (backoffHops >= 2) {
-      fuseClock += dt;
+      if (dToPlayer <= 4.6) {
+        fuseClock += dt;
+      } else {
+        fuseClock = Math.max(0, fuseClock - dt * 0.5);
+      }
       const cycleIdx = Math.floor(fuseClock / FUSE_PERIOD);
       const phase = (fuseClock % FUSE_PERIOD) / FUSE_PERIOD;
       const inFlash = isFlashWindowOpen();
@@ -371,7 +375,7 @@ const qCreeper = {
         backoffHops += 1;
         creeperActor?.setEmote?.('!');
         playSfx(ctx, 'hiss', { pos: centerPos, vol: 0.4, pitch: 1.25 });
-        startCreeperHop(ctx, BACKOFF_SPOTS[backoffHops], 0.58);
+        startCreeperHop(ctx, BACKOFF_SPOTS[backoffHops], 0.65);
         return true;
       }
 
@@ -405,19 +409,23 @@ const qCreeper = {
         return true;
       }
 
-      // Shuffle ~3b across clearing to start the next 1.4s fuse swell cycle!
+      // Shuffle across clearing to start the next 1.4s fuse swell cycle!
       patCooldown = 0.45;
       fuseClock = 0;
       lastCycleIdx = -1;
       const nextSpot = SHUFFLE_SPOTS[shuffleIdx % SHUFFLE_SPOTS.length];
       shuffleIdx += 1;
-      startCreeperHop(ctx, nextSpot, 0.44);
+      startCreeperHop(ctx, nextSpot, 0.72);
       return true;
     }
     return false;
   },
 
   onAction(ctx) {},
+
+  introPos(ctx) {
+    return { x: centerPos.x, y: centerPos.y + 1.1, z: centerPos.z };
+  },
 
   targets(ctx) {
     if (finishing) {
@@ -433,10 +441,11 @@ const qCreeper = {
     }
 
     if (hopArc) {
+      const pp = playerPos(ctx);
       return [
         {
           id: 'creeper_hop_wait',
-          pos: { x: hopArc.to.x, y: hopArc.to.y + 0.85, z: hopArc.to.z },
+          pos: { x: pp.x, y: pp.y + 0.85, z: pp.z },
           kind: 'wait',
           label: '跟着嘶嘶',
           range: 2.5,
@@ -485,6 +494,9 @@ const qCreeper = {
   },
 
   objective(ctx) {
+    if (backoffHops < 2 && !finishing) {
+      return { icon: '👣', have: backoffHops, need: 2 };
+    }
     return {
       icon: '💚',
       have: finishing ? NEED_GOOD_PATS : Math.min(NEED_GOOD_PATS, goodPats),

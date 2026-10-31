@@ -24,16 +24,16 @@ import {
 } from './kit.js';
 
 const TOTAL_RICHES = 10;
-const BANK_REWARD_CAP = 5;
-const DIAMOND_CAP = 2;
-const STALL_SLOT_TAPS = 3;
+const BANK_REWARD_CAP = 4;
+const DIAMOND_CAP = 3;
+const STALL_SLOT_TAPS = 5;
 
 const STALL_COUNTER = { x: 74.0, y: 8, z: 22.5 };
 const STALL_ARRIVE = { x: 74.2, y: 8, z: 24.3 };
 
 const WHEAT_SPOTS = [
-  { x: 58.5, y: 8, z: 28.5, label: '收金麦束' },
-  { x: 67.5, y: 8, z: 37.5, label: '收金麦束' },
+  { x: 54.5, y: 8, z: 29.5, label: '收金麦束' },
+  { x: 57.5, y: 8, z: 36.5, label: '收金麦束' },
   { x: 75.0, y: 8, z: 16.5, label: '收金麦束' },
 ];
 
@@ -449,7 +449,19 @@ const qVillager = {
     liveDiamonds.length = 0;
     mysteryRunning = false;
     mysteryLoopClock = 0;
-    if (villagerContestant) villagerContestant.setVisible(false);
+
+    if (!villagerContestant && ctx?.chars?.create) {
+      villagerContestant = ctx.chars.create('villager', { id: 'quest_villager_actor' });
+    }
+    if (villagerContestant) {
+      emeraldEyesGroup.visible = false;
+      villagerContestant.group.position.set(STALL_COUNTER.x, 8, STALL_COUNTER.z - 0.85);
+      villagerContestant.lookAt(STALL_ARRIVE);
+      villagerContestant.setAnim('wave');
+      villagerContestant.setEmote('💚');
+      villagerContestant.setVisible(true);
+      attachToScene(ctx, villagerContestant.group);
+    }
   },
 
   update(dt, ctx) {
@@ -491,8 +503,8 @@ const qVillager = {
           mysteryActor.group.position.set(mx, my, mz);
           mysteryActor.update(dt);
         }
-        const thresholds = [0.22, 0.52, 0.80];
-        while (mysteryDropsThisRun < 3 && u >= thresholds[mysteryDropsThisRun]) {
+        const thresholds = [0.30, 0.74];
+        while (mysteryDropsThisRun < 2 && u >= thresholds[mysteryDropsThisRun]) {
           dropMysteryDiamond(ctx, { x: mx, y: my, z: mz });
           mysteryDropsThisRun += 1;
         }
@@ -759,7 +771,28 @@ const qVillager = {
   },
 
   objective() {
-    return { icon: '💎', have: Math.min(riches, TOTAL_RICHES), need: TOTAL_RICHES };
+    const tradedCount = villagerEntries.filter((v) => v.traded).length;
+    if (tradedCount < 3) {
+      return { icon: '🌾', have: tradedCount, need: 3 };
+    }
+    if (diamondsCollected < DIAMOND_CAP) {
+      return { icon: '💎', have: diamondsCollected, need: DIAMOND_CAP };
+    }
+    if (!bankCracked && !signInspected) {
+      return { icon: '🪧', have: Math.min(signReads, 3), need: 3 };
+    }
+    if (!bankCracked) {
+      return { icon: '🔐', have: Math.min(codeStep, 3), need: 3 };
+    }
+    return {
+      icon: '💚',
+      have: completing ? STALL_SLOT_TAPS : Math.min(stallSlotSteps, STALL_SLOT_TAPS),
+      need: STALL_SLOT_TAPS,
+    };
+  },
+
+  introPos() {
+    return { x: STALL_COUNTER.x, y: 8.6, z: STALL_COUNTER.z - 0.5 };
   },
 
   action() {

@@ -418,6 +418,10 @@ export function createBoardUI(ctx = {}, hooks = {}) {
       rowEntry.cardsLane.appendChild(cardEl);
     }
 
+    for (const { cardsLane } of rowMap.values()) {
+      cardsLane.classList.toggle('is-crowded', cardsLane.children.length >= 7);
+    }
+
     // Populate tray polaroid in rank mode (before drop)
     if (newId) {
       trayBox.hidden = false;
@@ -658,7 +662,6 @@ export function createBoardUI(ctx = {}, hooks = {}) {
     const effectiveMode = newId && mode !== 'view' ? 'rank' : mode;
     if (ctx.state) ctx.state.scene = 'board';
     ctx.events?.emit?.('sceneChange', { scene: 'board', mode: effectiveMode, newId });
-    hooks.onOpen?.();
 
     closeBtn._resetTapDebounce?.();
 
@@ -684,6 +687,7 @@ export function createBoardUI(ctx = {}, hooks = {}) {
         resolve,
       };
 
+      hooks.onOpen?.();
       renderBoardCards();
 
       if (effectiveMode === 'rank' && newId && !progress.wasGhostHandShown()) {
@@ -746,7 +750,7 @@ export function createBoardUI(ctx = {}, hooks = {}) {
     hide: () => finishSession(),
     cancel: cancelSession,
     restoreWallFromProgress,
-    isActive: () => Boolean(session),
+    isActive: () => Boolean(session) || (!overlay.hidden && !overlay.classList.contains('ui-hidden')),
     update,
   };
 }

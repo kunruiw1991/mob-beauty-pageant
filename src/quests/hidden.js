@@ -402,6 +402,10 @@ export const pinksheepQuest = {
 
   onAction(ctx) {},
 
+  introPos(ctx) {
+    return { x: whiteSheepPos.x, y: whiteSheepPos.y + 0.9, z: whiteSheepPos.z };
+  },
+
   targets(ctx) {
     if (pinkFinishing) {
       return [
@@ -435,7 +439,10 @@ export const pinksheepQuest = {
   },
 
   objective(ctx) {
-    return { icon: '🌷', have: pinkFinishing ? 2 : hasPinkTulip ? 1 : 0, need: 2 };
+    if (!hasPinkTulip) {
+      return { icon: '🌷', have: 0, need: 1 };
+    }
+    return { icon: '🐑', have: pinkFinishing ? 1 : 0, need: 1 };
   },
 
   action(ctx) {

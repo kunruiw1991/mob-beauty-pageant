@@ -476,7 +476,15 @@ const qBee = {
   },
 
   objective() {
-    return { icon: '🐝', have: Math.min(roundIdx, 3), need: 3 };
+    const icons = ['🌸', '🌼', '🌺'];
+    const r = Math.min(roundIdx, ROUND_LENGTHS.length - 1);
+    const need = ROUND_LENGTHS[r];
+    const have = roundIdx >= ROUND_LENGTHS.length ? need : Math.min(inputStep, need);
+    return { icon: icons[r] || '🌸', have, need };
+  },
+
+  introPos() {
+    return { x: ringCenter.x, y: (ringCenter.y ?? 8) + 1.0, z: ringCenter.z };
   },
 
   action() {

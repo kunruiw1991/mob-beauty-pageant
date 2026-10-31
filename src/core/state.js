@@ -92,6 +92,11 @@ export function createInitialState(seed = 12345) {
       confetti: 0,
       fireworks: 0,
     },
+    gagCam: {
+      count: 0,
+      lastGag: null,
+      active: false,
+    },
     stars: 0,
     board: {},
     elapsedMs: 0,
@@ -237,6 +242,11 @@ export function snapshotState(state) {
       shakes: state.stats?.shakes | 0,
       confetti: state.stats?.confetti | 0,
       fireworks: state.stats?.fireworks | 0,
+    },
+    gagCam: {
+      count: state.gagCam?.count | 0,
+      lastGag: state.gagCam?.lastGag ?? null,
+      active: Boolean(state.gagCam?.active),
     },
     stars: state.stars | 0,
     board: { ...(state.board || {}) },

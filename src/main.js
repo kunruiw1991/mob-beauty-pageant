@@ -255,6 +255,17 @@ async function boot() {
 
   // Characters & Plaza Crowd
   ctx.chars = createChars(ctx);
+  if (typeof ctx.chars?.create === 'function') {
+    const rawCreateChar = ctx.chars.create.bind(ctx.chars);
+    ctx.chars.create = (kind, opts = {}) => {
+      const actor = rawCreateChar(kind, opts);
+      if (actor?.group) {
+        actor.group.userData._actorKind = kind;
+        actor.group.userData._actorId = opts?.id || kind;
+      }
+      return actor;
+    };
+  }
   ctx.crowdCtrl = ctx.chars?.crowd ? ctx.chars.crowd(ctx.scene, buildBleacherSeats()) : null;
   ctx.crowd = ctx.crowdCtrl;
   if (typeof ctx.chars?.crowd === 'function' && ctx.crowdCtrl) {
@@ -297,6 +308,365 @@ async function boot() {
     }
   });
 
+  // #155 G1 GAG CAM: 1.4 s reaction cut (dist ~5.8, zoom-in punch, large emote bubble, quest sim paused)
+  const GAG_EMOTES = {
+    sheep_eats_bouquet: '😋🌸',
+    kai_bounced: '💦😱',
+    slime_pet: '💚✨',
+    cat_gift_kai_hat: '😼🎩',
+    fake_iron: '💢🪨',
+    kai_hogs_pumpkins: '🎃😜',
+    snow_head_pop: '🎃❗',
+    kai_snowman: '⛄🥶',
+    creeper_confetti: '🎉💥',
+    kai_honey: '🍯😫',
+    kai_steal: '😈💨',
+    kai_cake_face: '🎂😵',
+    wither_three_hats: '🎩👑',
+    skeleton_bald: '💀😳',
+    emerald_eyes: '💎🤩',
+    kai_faint: '💫😵',
+    egg_hop: '🥚💨',
+    pink_dye: '🌷💖',
+  };
+
+  const gagBubbleCanvas = document.createElement('canvas');
+  gagBubbleCanvas.width = 256;
+  gagBubbleCanvas.height = 256;
+  const gagBubbleCtx = gagBubbleCanvas.getContext('2d');
+  const gagBubbleTex = new THREE.CanvasTexture(gagBubbleCanvas);
+  gagBubbleTex.colorSpace = THREE.SRGBColorSpace;
+  const gagBubbleMat = new THREE.SpriteMaterial({
+    map: gagBubbleTex,
+    transparent: true,
+    depthTest: false,
+    depthWrite: false,
+  });
+  const gagBubbleSprite = new THREE.Sprite(gagBubbleMat);
+  gagBubbleSprite.visible = false;
+  gagBubbleSprite.renderOrder = 950;
+  ctx.scene.add(gagBubbleSprite);
+
+  function drawGagBubbleEmoji(emojiText) {
+    if (!gagBubbleCtx) return;
+    const g = gagBubbleCtx;
+    g.clearRect(0, 0, 256, 256);
+
+    // Comic speech bubble with tail + bold dark outline + golden inner rim
+    const bx = 18;
+    const by = 22;
+    const bw = 220;
+    const bh = 166;
+    const br = 44;
+
+    const traceBubble = (pad = 0) => {
+      const x = bx - pad;
+      const y = by - pad;
+      const w = bw + pad * 2;
+      const h = bh + pad * 2;
+      const r = br + pad * 0.6;
+      g.beginPath();
+      g.moveTo(x + r, y);
+      g.lineTo(x + w - r, y);
+      g.quadraticCurveTo(x + w, y, x + w, y + r);
+      g.lineTo(x + w, y + h - r);
+      g.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      // Tail on bottom-left pointing diagonally toward character's head
+      g.lineTo(108 + pad * 0.4, y + h);
+      g.lineTo(54 - pad * 0.8, 228 + pad * 1.1);
+      g.lineTo(72 - pad * 0.4, y + h);
+      g.lineTo(x + r, y + h);
+      g.quadraticCurveTo(x, y + h, x, y + h - r);
+      g.lineTo(x, y + r);
+      g.quadraticCurveTo(x, y, x + r, y);
+      g.closePath();
+    };
+
+    g.save();
+    g.shadowColor = 'rgba(0,0,0,0.38)';
+    g.shadowBlur = 12;
+    g.shadowOffsetY = 6;
+    traceBubble(6);
+    g.fillStyle = '#1d1526';
+    g.fill();
+    g.restore();
+
+    traceBubble(0);
+    g.fillStyle = '#fffdf4';
+    g.fill();
+    g.lineWidth = 7;
+    g.strokeStyle = '#ffbe0b';
+    g.stroke();
+
+    g.font = '82px "Apple Color Emoji", "Noto Color Emoji", "Segoe UI Emoji", sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText(emojiText || '❗😄', 128, 108);
+    gagBubbleTex.needsUpdate = true;
+  }
+
+  const gagQueue = [];
+  const gagTempBox = new THREE.Box3();
+  let gagCamRemaining = 0;
+  let gagCamDuration = 1.4;
+  let gagCamElapsed = 0;
+  let gagCamFrame = -1;
+  let gagCamAnchor = { x: 48, y: 8, z: 48 };
+  let gagSubjectGroup = null;
+  let gagCharHeight = 2.2;
+
+  function pickClearGagYaw(focusPos, dist = 5.8, height = 2.65) {
+    const baseYaw = ctx.cam?.yaw ?? 0;
+    const offsets = [0, 0.55, -0.55, 1.15, -1.15, 1.85, -1.85, Math.PI];
+    let bestYaw = baseYaw;
+    let bestClear = -1;
+
+    for (const off of offsets) {
+      let cand = baseYaw + off;
+      while (cand > Math.PI) cand -= Math.PI * 2;
+      while (cand < -Math.PI) cand += Math.PI * 2;
+
+      if (typeof ctx.world?.raycast !== 'function') {
+        return cand;
+      }
+      const cx = focusPos.x + Math.sin(cand) * dist;
+      const cy = focusPos.y + height;
+      const cz = focusPos.z + Math.cos(cand) * dist;
+      const dx = focusPos.x - cx;
+      const dy = focusPos.y - cy;
+      const dz = focusPos.z - cz;
+      const len = Math.hypot(dx, dy, dz) || 1;
+      const hit = ctx.world.raycast(
+        { x: cx, y: cy, z: cz },
+        { x: dx / len, y: dy / len, z: dz / len },
+        Math.max(0.5, len - 0.85)
+      );
+      if (!hit) {
+        return cand;
+      }
+      const hitDist = Math.hypot(
+        hit.pos.x + 0.5 - cx,
+        hit.pos.y + 0.5 - cy,
+        hit.pos.z + 0.5 - cz
+      );
+      if (hitDist > bestClear) {
+        bestClear = hitDist;
+        bestYaw = cand;
+      }
+    }
+    return bestYaw;
+  }
+
+  function resolveGagWorldPos(payload) {
+    const p = payload?.pos;
+    if (p && Number.isFinite(p.x) && Number.isFinite(p.z)) {
+      const sy = Number.isFinite(p.y)
+        ? p.y
+        : (ctx.world?.surfaceY?.(Math.floor(p.x), Math.floor(p.z)) ?? 8);
+      return { x: p.x, y: sy, z: p.z };
+    }
+    const gid = String(payload?.gagId || '');
+    if (gid.startsWith('kai_') && Number.isFinite(state.rival?.x) && (state.rival.x || state.rival.z)) {
+      const ry = ctx.world?.surfaceY?.(Math.floor(state.rival.x), Math.floor(state.rival.z)) ?? 8;
+      return { x: state.rival.x, y: ry, z: state.rival.z };
+    }
+    if (state.quest?.pointer) {
+      return {
+        x: state.quest.pointer.x,
+        y: state.quest.pointer.y ?? 8,
+        z: state.quest.pointer.z,
+      };
+    }
+    return {
+      x: ctx.player.pos.x,
+      y: ctx.player.pos.y,
+      z: ctx.player.pos.z,
+    };
+  }
+
+  let gagCamYaw = 0;
+
+  function findGagSubjectObject(gagId, questId, worldPos) {
+    if (!ctx.scene?.children) return null;
+    const gid = String(gagId || '');
+    const preferredKind = gid.startsWith('kai_')
+      ? 'kai'
+      : gid === 'fake_iron'
+        ? 'bela'
+        : gid === 'emerald_eyes'
+          ? 'cuicui'
+          : gid === 'skeleton_bald'
+            ? 'skeletonMob'
+            : questId || null;
+
+    let bestPreferred = null;
+    let bestPrefDist = Infinity;
+    let bestAnyActor = null;
+    let bestAnyDist = Infinity;
+
+    for (const ch of ctx.scene.children) {
+      if (
+        !ch ||
+        !ch.visible ||
+        ch === ctx.player?.group ||
+        ch === gagBubbleSprite ||
+        !ch.isGroup
+      ) {
+        continue;
+      }
+      const kind = ch.userData?._actorKind || null;
+      if (!kind) continue;
+      const d = Math.hypot(ch.position.x - worldPos.x, ch.position.z - worldPos.z);
+      if (d > 9.0) continue;
+      if (preferredKind && kind === preferredKind && d < bestPrefDist) {
+        bestPrefDist = d;
+        bestPreferred = ch;
+      }
+      if (d < bestAnyDist) {
+        bestAnyDist = d;
+        bestAnyActor = ch;
+      }
+    }
+    return bestPreferred || bestAnyActor;
+  }
+
+  function computeVisibleTopY(root, baseY) {
+    let topY = baseY + 2.15;
+    const stack = [root];
+    while (stack.length > 0) {
+      const node = stack.pop();
+      if (!node || !node.visible) continue;
+      if (node.isMesh && node.geometry) {
+        if (!node.geometry.boundingBox) node.geometry.computeBoundingBox();
+        gagTempBox.copy(node.geometry.boundingBox).applyMatrix4(node.matrixWorld);
+        if (Number.isFinite(gagTempBox.max.y) && gagTempBox.max.y > topY) {
+          topY = gagTempBox.max.y;
+        }
+      }
+      if (node.children) {
+        for (let i = 0; i < node.children.length; i++) stack.push(node.children[i]);
+      }
+    }
+    return Math.min(baseY + 3.6, topY);
+  }
+
+  function computeGagFramingFromSubject() {
+    let sx = gagCamAnchor.x;
+    let sy = gagCamAnchor.y;
+    let sz = gagCamAnchor.z;
+    let charH = 2.15;
+
+    if (gagSubjectGroup && gagSubjectGroup.parent && gagSubjectGroup.visible) {
+      gagSubjectGroup.updateMatrixWorld(true);
+      sx = gagSubjectGroup.position.x;
+      sy = gagSubjectGroup.position.y;
+      sz = gagSubjectGroup.position.z;
+      charH = Math.max(1.8, computeVisibleTopY(gagSubjectGroup, sy) - sy);
+    }
+    gagCharHeight = charH;
+
+    // #165: Frame whole body — look-at = subject + 0.9 up (auto-lifting for >2.15b tall/pop-in-stretched rigs),
+    // dist ~7.05 so head top stays <=1.25b above look-at (strictly >= 20% from top, well below 12% HUD band) at all 4 viewports!
+    const lookUp = Math.max(0.9, charH - 1.25);
+    const dist = Math.max(7.05, 4.9 + charH * 0.95);
+    return {
+      sx,
+      sy,
+      sz,
+      charH,
+      focusTarget: { x: sx, y: sy + lookUp, z: sz },
+      dist,
+      height: 2.25,
+    };
+  }
+
+  function updateGagBubbleTransform(framing = null) {
+    const f = framing || computeGagFramingFromSubject();
+    // Place large comic bubble to camera-right at chest/shoulder height so it stays well below top HUD band
+    const rightX = Math.cos(gagCamYaw);
+    const rightZ = -Math.sin(gagCamYaw);
+    const popT = Math.min(1, gagCamElapsed / 0.22);
+    const bounce =
+      popT < 1
+        ? 0.4 + Math.sin(popT * Math.PI * 0.78) * 1.45
+        : 1.65 + Math.sin(gagCamElapsed * 8.0) * 0.06;
+    gagBubbleSprite.scale.set(bounce, bounce, 1);
+    gagBubbleSprite.position.set(
+      f.sx + rightX * 1.42,
+      f.sy + Math.min(1.55, f.charH * 0.65) + Math.sin(gagCamElapsed * 6.5) * 0.06,
+      f.sz + rightZ * 1.42
+    );
+  }
+
+  function startSingleGagCut(gagId, worldPos, durationSec = 1.4, questId = null) {
+    gagCamDuration = durationSec;
+    gagCamRemaining = durationSec;
+    gagCamElapsed = 0;
+    const groundY =
+      ctx.world?.surfaceY?.(Math.floor(worldPos.x), Math.floor(worldPos.z)) ?? worldPos.y ?? 8;
+    // Normalize anchor to subject feet/base (emitGag often passes y+0.9 or water surface)
+    const baseY = Math.min(worldPos.y ?? groundY, groundY + 0.2);
+    gagCamAnchor = { x: worldPos.x, y: baseY, z: worldPos.z };
+    gagSubjectGroup = findGagSubjectObject(gagId, questId || state.quest?.id, gagCamAnchor);
+    state.gagCam.active = true;
+
+    const f = computeGagFramingFromSubject();
+    const clearYaw = pickClearGagYaw(f.focusTarget, f.dist, f.height);
+    gagCamYaw = clearYaw;
+    ctx.cam.focus(f.focusTarget, {
+      distance: f.dist,
+      height: f.height,
+      yaw: clearYaw,
+      zoomPunch: 0.9,
+      instant: true,
+      manualClearOnly: true,
+    });
+
+    drawGagBubbleEmoji(GAG_EMOTES[gagId] || '❗😄');
+    updateGagBubbleTransform(f);
+    gagBubbleSprite.visible = true;
+  }
+
+  function clearGagCam({ restoreFollow = false } = {}) {
+    gagQueue.length = 0;
+    gagCamRemaining = 0;
+    gagCamElapsed = 0;
+    gagCamFrame = -1;
+    gagSubjectGroup = null;
+    if (state.gagCam) {
+      state.gagCam.active = false;
+    }
+    gagBubbleSprite.visible = false;
+    if (restoreFollow && state.scene === 'world') {
+      ctx.cam.clearFocus();
+    }
+  }
+
+  events.on('gag', (payload) => {
+    const gagId = String(payload?.gagId || 'gag');
+    if (!state.gagCam) {
+      state.gagCam = { count: 0, lastGag: null, active: false };
+    }
+    state.gagCam.count = (state.gagCam.count | 0) + 1;
+    state.gagCam.lastGag = gagId;
+
+    if (state.scene !== 'world') return;
+
+    const gPos = resolveGagWorldPos(payload);
+    if (gagCamRemaining > 0 && gagCamFrame === state.frame) {
+      // Back-to-back synchronous gags (e.g. villager emerald_eyes + kai_faint):
+      // give each its own fast centered zoom-punch reaction cut so neither is missed!
+      gagCamRemaining = Math.min(gagCamRemaining, 0.85);
+      gagCamDuration = gagCamRemaining;
+      gagQueue.push({ gagId, questId: payload?.questId || null, pos: gPos, duration: 0.95 });
+      return;
+    }
+
+    gagQueue.length = 0;
+    gagCamFrame = state.frame;
+    startSingleGagCut(gagId, gPos, 1.4, payload?.questId || null);
+  });
+
   // Tap routing with strict synchronous feedback guarantee (0 dead taps!)
   function dispatchHitTap(hit, sx = 0, sy = 0) {
     const safePos = hit?.pos || {
@@ -313,6 +683,13 @@ async function boot() {
         events.emit('feedback', { kind: 'blocked', pos: safePos });
       }
       return false;
+    }
+
+    if (state.gagCam?.active && !hit?.fromAgent) {
+      if (feedbackCounter === fbBefore) {
+        events.emit('feedback', { kind: 'interact', pos: safePos });
+      }
+      return true;
     }
 
     // 1. Let active quest / beacon / passive hidden quests handle entity or in-range taps
@@ -497,7 +874,8 @@ async function boot() {
         fromBeaconArrow: true,
       };
       const ok = dispatchHitTap(hit, scr.sx, scr.sy);
-      if (!ctx.player.isMoving() && beaconTarget.pos) {
+      const movingNow = Boolean(ctx.player?.isMoving?.() || state.player?.moving);
+      if (!movingNow && beaconTarget.pos) {
         const d = Math.hypot(beaconTarget.pos.x - ctx.player.pos.x, beaconTarget.pos.z - ctx.player.pos.z);
         if (d > 2.2) {
           ctx.player.walkTo(
@@ -506,7 +884,7 @@ async function boot() {
           );
         }
       }
-      return ok || ctx.player.isMoving();
+      return ok || Boolean(ctx.player?.isMoving?.() || state.player?.moving);
     }
 
     const guide = getBeaconGuide();
@@ -794,6 +1172,7 @@ async function boot() {
   });
 
   function returnToWorld() {
+    clearGagCam({ restoreFollow: false });
     cleanupRunwayActor();
     if (ctx.player?.group) ctx.player.group.visible = true;
     state.scene = 'world';
@@ -809,6 +1188,7 @@ async function boot() {
 
   async function enterBooth(contestantId) {
     ensureWorldBuilt();
+    clearGagCam({ restoreFollow: false });
     const myToken = ++flowToken;
     if (state.area !== 'hub') {
       ctx.areas.setArea('hub', { x: 48, y: 8, z: 62 }, { silent: true });
@@ -931,6 +1311,7 @@ async function boot() {
   // Core Lifecycle Methods exposed on ctx for UI & Seam
   ctx.startGame = ({ seed, resume = false, replay = false, skipIntro = false } = {}) => {
     ensureWorldBuilt();
+    clearGagCam({ restoreFollow: false });
     flowToken += 1;
     lastReactionSig = '';
     lastCollectFrame = -1;
@@ -995,6 +1376,8 @@ async function boot() {
   };
 
   ctx.continueHunt = () => {
+    flowToken += 1;
+    ctx.ui?.cancelOverlays?.();
     ctx.loop.setPaused(false);
     returnToWorld();
   };
@@ -1005,6 +1388,7 @@ async function boot() {
 
   ctx.teleport = (questId) => {
     ensureWorldBuilt();
+    clearGagCam({ restoreFollow: true });
     if (state.scene === 'title') {
       ctx.startGame({ seed: state.seed, skipIntro: true });
     } else if (state.scene !== 'world') {
@@ -1086,10 +1470,22 @@ async function boot() {
   ctx.ui.showTitle();
   ctx.ui.showHUD(false);
 
-  // Terrain cutaway uniform driver (#144: uCutA=camPos, uCutB=playerHead, uCutR=2.2, minY=player.y+0.6; off in booth/cutscenes)
+  // Terrain cutaway uniform driver (#144 + #155 G1/G2: clears obstructions in both follow AND world focus cuts)
   const cutHeadPos = { x: 48, y: 9.3, z: 66 };
   function syncCutawayUniforms() {
     if (!ctx.world?.setCutaway) return;
+    if (state.scene === 'world' && ctx.cam?.mode === 'focus' && ctx.cam?.target) {
+      cutHeadPos.x = ctx.cam.target.x;
+      cutHeadPos.y = ctx.cam.target.y + 0.35;
+      cutHeadPos.z = ctx.cam.target.z;
+      ctx.world.setCutaway(
+        ctx.camera.position,
+        cutHeadPos,
+        2.6,
+        Math.max(8.5, ctx.cam.target.y - 0.3)
+      );
+      return;
+    }
     const active =
       state.scene === 'world' &&
       ctx.cam?.mode === 'follow' &&
@@ -1113,10 +1509,27 @@ async function boot() {
     onSlice: drainBuildSlice,
     onStep(dt) {
       if (state.scene === 'world') {
-        ctx.player.update(dt);
         ctx.areas.update(dt);
-        ctx.quests?.update?.(dt);
         ctx.rival?.update?.(dt);
+        if (gagCamRemaining > 0) {
+          // #155 G1 + #165: pause quest sim & player walk during 1.4 s Gag Cam, live-track subject full body!
+          gagCamRemaining -= dt;
+          gagCamElapsed += dt;
+          const f = computeGagFramingFromSubject();
+          ctx.cam.updateFocusTarget?.(f.focusTarget, { distance: f.dist, height: f.height });
+          updateGagBubbleTransform(f);
+          if (gagCamRemaining <= 0) {
+            if (gagQueue.length > 0) {
+              const nextGag = gagQueue.shift();
+              startSingleGagCut(nextGag.gagId, nextGag.pos, nextGag.duration || 0.95, nextGag.questId);
+            } else {
+              clearGagCam({ restoreFollow: true });
+            }
+          }
+        } else {
+          ctx.player.update(dt);
+          ctx.quests?.update?.(dt);
+        }
       } else if (state.scene === 'booth' || state.scene === 'board' || state.scene === 'finale') {
         if (runwayActor) {
           runwayActor.update?.(dt);
@@ -1158,6 +1571,7 @@ async function boot() {
   });
 
   // Expose frozen window.__PAGEANT__ seam (§3.9)
+  window.__CTX__ = ctx;
   createSeam(ctx);
 
   // Resize handler

@@ -1,5 +1,6 @@
 // Quest 4: golem — 铁铁 (Cave 2 ore -> 贝拉's statue 2 fake-iron dirt swap + nose fall ->
-// 小凯 pumpkin hog -> NW Snow Golem patrol head pop -> 5-slot T altar + rumble/shake spawn + poppy offer, §6.4 & #143).
+// 小凯 hogs 3 pumpkins -> NW Snow Golem startled hop + head pop + pumpkin pickup ->
+// 5-slot T altar + rumble/shake spawn + poppy offer, §6.4, #143, #155 G2).
 
 import * as THREE from '../../vendor/three.module.min.js';
 import { B } from '../world/blocks.js';
@@ -10,6 +11,7 @@ import {
   distXZ,
   createTimers,
   createBreakable,
+  createCollectible,
   createGhostSlot,
   createPatrol,
   emitGag,
@@ -33,6 +35,8 @@ let pumpkinUnpicks = [];
 let snowGolemActor = null;
 let snowGolemUnpick = null;
 let snowPatrol = null;
+let snowHopArc = null;
+let droppedPumpkin = null;
 let belaActor = null;
 let golemActor = null;
 let poppyProp = null;
@@ -40,18 +44,23 @@ let poppyUnpick = null;
 let altarSlots = [];
 let restoredVoxels = [];
 
-// Phases: 'mine' -> 'statue' -> 'bela_gag' -> 'pumpkin' -> 'kai_gag' -> 'snow' -> 'snow_gag' -> 'altar' -> 'rumble' -> 'poppy' -> 'done_anim'
+// Phases: 'mine' -> 'statue' -> 'bela_gag' -> 'pumpkin' -> 'kai_gag' -> 'snow' -> 'snow_gag' -> 'pickup_pumpkin' -> 'altar' -> 'rumble' -> 'poppy' -> 'done_anim'
 let phase = 'mine';
-let ironHave = 0;
+let oresBroken = 0;
+let statueBorrowed = 0;
 let pumpkinsTried = 0;
+let snowTaps = 0;
+let hasSnowPumpkin = false;
 let slotsPlaced = 0;
 
-let snowGolemPos = { x: 44.5, y: 8, z: 10.5 };
+let snowGolemPos = { x: 38.5, y: 8, z: 8.5 };
 let altarBase = { x: 66.5, y: 8, z: 26.5 };
 
 const PUMPKIN_SPOTS = [
-  { x: 79.5, y: 8, z: 19.5 },
-  { x: 77.5, y: 8, z: 21.5 },
+  { x: 74.5, y: 8, z: 17.5 },
+  { x: 80.5, y: 8, z: 21.5 },
+  { x: 74.5, y: 8, z: 25.5 },
+  { x: 80.5, y: 8, z: 25.5 },
 ];
 
 function setWorldVoxelWithRestore(ctx, bx, by, bz, newId) {
@@ -71,6 +80,38 @@ function buildFakeDirtMesh(pos) {
   tape2.position.y = -0.18;
   g.add(dirt, tape1, tape2);
   return g;
+}
+
+function spawnDroppedSnowPumpkin(ctx) {
+  droppedPumpkin?.destroy?.();
+  const candidates = [
+    { x: 45.5, z: 16.5 },
+    { x: 38.5, z: 8.5 },
+    { x: 37.5, z: 19.5 },
+  ];
+  let best = candidates[0];
+  for (const c of candidates) {
+    if (distXZ(snowGolemPos, c) > distXZ(snowGolemPos, best)) best = c;
+  }
+  const landPos = { x: best.x, y: surfaceY(ctx, best.x, best.z, 8), z: best.z };
+  droppedPumpkin = createCollectible(ctx, {
+    id: 'golem_dropped_pumpkin',
+    pos: landPos,
+    color: 0xe38a1d,
+    stemColor: 0x3fae3a,
+    sparkle: true,
+    size: 0.72,
+    autoPickupRadius: 0,
+    range: 2.35,
+    label: '捡起南瓜头',
+    onCollect: () => {
+      hasSnowPumpkin = true;
+      playSfx(ctx, 'xp', { pos: landPos, pitch: 1.35 });
+      phase = 'altar';
+      spawnAltarSlots(ctx);
+      ctx?.events?.emit?.('questStep', { id: 'golem', step: 4 });
+    },
+  });
 }
 
 function spawnAltarSlots(ctx) {
@@ -110,12 +151,12 @@ function triggerGolemRumbleAndRise(ctx) {
   phase = 'rumble';
   const spawnPos = { x: altarBase.x, y: altarBase.y, z: altarBase.z };
 
-  // §6.4: rumble 0.8 s + camera shake!
+  // §6.4: rumble + camera shake!
   playSfx(ctx, 'rumble', { pos: spawnPos });
   ctx?.fx?.shake?.(0.6, 0.5);
   ctx?.fx?.sparkles?.({ x: spawnPos.x, y: spawnPos.y + 1.5, z: spawnPos.z }, 18, { toPlayer: false });
 
-  timers.after(0.85, () => {
+  timers.after(1.45, () => {
     for (const s of altarSlots) {
       s.group.visible = false;
     }
@@ -130,7 +171,7 @@ function triggerGolemRumbleAndRise(ctx) {
         anim: 'spawn',
       });
       golemActor?.setEmote?.('🌹');
-      golemActor?.lookAt?.(playerPos(ctx));
+      golemActor?.lookAt?.({ x: spawnPos.x, y: spawnPos.y, z: spawnPos.z - 2 });
     }
 
     // Red poppy flower offered in 铁铁's outstretched hand (§6.4)!
@@ -139,7 +180,7 @@ function triggerGolemRumbleAndRise(ctx) {
     const bloom = new THREE.Mesh(sharedBoxGeo(0.34, 0.28, 0.34), sharedLambertMat(0xe23226));
     bloom.position.y = 0.24;
     poppyProp.add(stem, bloom);
-    poppyProp.position.set(spawnPos.x, spawnPos.y + 1.15, spawnPos.z + 0.85);
+    poppyProp.position.set(spawnPos.x, spawnPos.y + 1.15, spawnPos.z - 0.85);
     attachToScene(ctx, poppyProp);
 
     poppyUnpick = registerPick(ctx, poppyProp, {
@@ -151,11 +192,12 @@ function triggerGolemRumbleAndRise(ctx) {
     });
   });
 
-  timers.after(1.75, () => {
+  timers.after(2.8, () => {
     if (phase === 'rumble') {
       phase = 'poppy';
       golemActor?.setAnim?.('wave');
-      ctx?.fx?.sparkles?.({ x: spawnPos.x, y: spawnPos.y + 1.3, z: spawnPos.z + 0.85 }, 8, { toPlayer: false });
+      golemActor?.lookAt?.(playerPos(ctx));
+      ctx?.fx?.sparkles?.({ x: spawnPos.x, y: spawnPos.y + 1.3, z: spawnPos.z - 0.85 }, 8, { toPlayer: false });
     }
   });
 }
@@ -173,7 +215,7 @@ function acceptPoppyAndFinish(ctx) {
   ctx?.fx?.hearts?.(hPos, 18);
   ctx?.fx?.sparkles?.(hPos, 12, { toPlayer: true });
 
-  timers.after(0.95, () => {
+  timers.after(1.8, () => {
     ctx?.quests?.complete?.('golem');
   });
 }
@@ -189,9 +231,13 @@ const qGolem = {
     qGolem.cleanup(ctx);
     timers = createTimers();
     phase = 'mine';
-    ironHave = 0;
+    oresBroken = 0;
+    statueBorrowed = 0;
     pumpkinsTried = 0;
+    snowTaps = 0;
+    hasSnowPumpkin = false;
     slotsPlaced = 0;
+    snowHopArc = null;
     restoredVoxels = [];
 
     const cavePoi = poi(ctx, 'cave', { x: 79.5, y: 8, z: 46.5 });
@@ -200,10 +246,10 @@ const qGolem = {
 
     altarBase = { x: Math.floor(altarPoi.x) + 0.5, y: altarPoi.y ?? 8, z: Math.floor(altarPoi.z) - 0.5 };
 
-    // 1. Two 3-tap Iron Ore blocks inside lit cave room (walkable neighbors at 82.5, 8, 44.5 & 48.5)
+    // 1. Two 3-tap Iron Ore blocks (one inside lit cave room, one on N hill flank)
     const oreCoords = [
-      { x: 83.5, y: cavePoi.y ?? 8, z: 44.5, wx: 83, wy: 8, wz: 44 },
-      { x: 83.5, y: cavePoi.y ?? 8, z: 48.5, wx: 83, wy: 8, wz: 48 },
+      { x: 83.5, y: cavePoi.y ?? 8, z: 44.5, wx: 83, wy: 8, wz: 44, clearVoxel: true },
+      { x: 76.5, y: 8, z: 39.5, wx: 76, wy: 8, wz: 39, clearVoxel: false },
     ];
     ores = oreCoords.map((oc, i) =>
       createBreakable(ctx, {
@@ -216,9 +262,11 @@ const qGolem = {
         label: '铁矿石',
         range: 2.35,
         onBreak: () => {
-          setWorldVoxelWithRestore(ctx, oc.wx, oc.wy, oc.wz, B.AIR);
-          ironHave += 1;
-          playSfx(ctx, 'xp', { pos: oc, pitch: 1.0 + ironHave * 0.1 });
+          if (oc.clearVoxel) {
+            setWorldVoxelWithRestore(ctx, oc.wx, oc.wy, oc.wz, B.AIR);
+          }
+          oresBroken += 1;
+          playSfx(ctx, 'xp', { pos: oc, pitch: 1.0 + oresBroken * 0.1 });
           if (ores.every((o) => o.broken) && phase === 'mine') {
             phase = 'statue';
             ctx?.events?.emit?.('questStep', { id: 'golem', step: 1 });
@@ -234,7 +282,6 @@ const qGolem = {
       { bx: statX - 1, by: 8, bz: statZ },
       { bx: statX + 1, by: 8, bz: statZ },
     ];
-    let borrowedCount = 0;
     statueBlocks = statBlocksCfg.map((sb, i) =>
       createBreakable(ctx, {
         id: `golem_statue_${i}`,
@@ -245,15 +292,14 @@ const qGolem = {
         label: '雕像铁块',
         range: 2.35,
         onBreak: () => {
-          borrowedCount += 1;
-          ironHave += 1;
+          statueBorrowed += 1;
           setWorldVoxelWithRestore(ctx, sb.bx, sb.by, sb.bz, B.DIRT);
           const dirtProp = buildFakeDirtMesh({ x: sb.bx + 0.5, y: sb.by, z: sb.bz + 0.5 });
           attachToScene(ctx, dirtProp);
           fakeDirtMeshes.push(dirtProp);
           playSfx(ctx, 'hit_soft', { pos: { x: sb.bx + 0.5, y: sb.by + 0.5, z: sb.bz + 0.5 } });
 
-          if (borrowedCount >= 2) {
+          if (statueBorrowed >= 2) {
             // §6.4 Gag 1: 贝拉 pops out 💢 and the statue's iron nose falls off!
             setWorldVoxelWithRestore(ctx, statX, 10, statZ + 1, B.AIR);
             fallenNoseMesh = new THREE.Mesh(sharedBoxGeo(0.9, 0.9, 0.9), sharedLambertMat(0xe6e6e6));
@@ -274,9 +320,8 @@ const qGolem = {
             }
             emitGag(ctx, 'golem', 'fake_iron', { x: statX + 0.5, y: 9, z: statZ + 1 });
 
-            // Let the kid see 贝拉 storm out & the iron nose tumble before moving on!
             phase = 'bela_gag';
-            timers.after(2.2, () => {
+            timers.after(2.8, () => {
               if (phase === 'bela_gag') {
                 phase = 'pumpkin';
                 ctx?.events?.emit?.('questStep', { id: 'golem', step: 2 });
@@ -287,7 +332,7 @@ const qGolem = {
       })
     );
 
-    // 3a. Two tempting pumpkins in the pumpkin patch (小凯 snatches both, hogging the patch!)
+    // 3a. Three tempting pumpkins across the NE pumpkin patch (小凯 snatches all 3!)
     pumpkinProps = [];
     pumpkinUnpicks = [];
     PUMPKIN_SPOTS.forEach((ps, idx) => {
@@ -299,7 +344,12 @@ const qGolem = {
       pStem.position.y = 0.52;
       pg.add(pBody, pStem);
       attachToScene(ctx, pg);
-      pumpkinProps.push({ group: pg, pos: { x: ps.x, y: py, z: ps.z }, snatched: false, id: `golem_pumpkin_${idx}` });
+      pumpkinProps.push({
+        group: pg,
+        pos: { x: ps.x, y: py, z: ps.z },
+        snatched: false,
+        id: `golem_pumpkin_${idx}`,
+      });
       pumpkinUnpicks.push(
         registerPick(ctx, pg, {
           id: `golem_pumpkin_${idx}`,
@@ -311,11 +361,11 @@ const qGolem = {
       );
     });
 
-    // 3b. Snow Golem patrolling across the NW Snowy Pocket (44.5, 10.5 <-> 38.5, 21.5)
+    // 3b. Snow Golem patrolling across the NW Snowy Pocket (38.5, 8.5 <-> 44.5, 12.5 <-> 42.5, 18.5)
     const snowWaypoints = [
-      { x: 44.5, y: surfaceY(ctx, 44.5, 10.5, 8), z: 10.5 },
-      { x: 48.5, y: surfaceY(ctx, 48.5, 16.5, 8), z: 16.5 },
-      { x: 38.5, y: surfaceY(ctx, 38.5, 21.5, 8), z: 21.5 },
+      { x: 38.5, y: 8, z: 8.5 },
+      { x: 44.5, y: 8, z: 12.5 },
+      { x: 42.5, y: 8, z: 18.5 },
     ];
     snowPatrol = createPatrol(snowWaypoints, { speed: 1.75, pauseSec: 0.35, pingPong: true });
     snowGolemPos = { ...snowWaypoints[0] };
@@ -345,10 +395,30 @@ const qGolem = {
     for (const o of ores) o.update(dt);
     for (const sb of statueBlocks) sb.update(dt);
     for (const sl of altarSlots) sl.update(dt);
+    droppedPumpkin?.update?.(dt, ctx);
 
-    if (phase === 'snow' && snowPatrol && snowGolemActor) {
+    if (snowHopArc) {
+      snowHopArc.elapsed += dt;
+      const u = Math.min(1, snowHopArc.elapsed / snowHopArc.duration);
+      snowGolemPos.x = snowHopArc.from.x + (snowHopArc.to.x - snowHopArc.from.x) * u;
+      snowGolemPos.z = snowHopArc.from.z + (snowHopArc.to.z - snowHopArc.from.z) * u;
+      snowGolemPos.y = 8;
+      const lift = Math.sin(u * Math.PI) * 1.15;
+      if (snowGolemActor?.group) {
+        snowGolemActor.group.position.set(snowGolemPos.x, snowGolemPos.y + lift, snowGolemPos.z);
+      }
+      if (u >= 1) {
+        snowGolemPos = { ...snowHopArc.to };
+        snowHopArc = null;
+        if (snowGolemActor?.group) {
+          snowGolemActor.group.position.set(snowGolemPos.x, snowGolemPos.y, snowGolemPos.z);
+        }
+        snowGolemActor?.setAnim?.('walk');
+      }
+      snowGolemActor?.update?.(dt);
+    } else if (phase === 'snow' && snowPatrol && snowGolemActor) {
       const np = snowPatrol.step(dt, snowGolemActor);
-      snowGolemPos = { x: np.x, y: surfaceY(ctx, np.x, np.z, 8), z: np.z };
+      snowGolemPos = { x: np.x, y: 8, z: np.z };
       if (snowGolemActor.group) snowGolemActor.group.position.set(snowGolemPos.x, snowGolemPos.y, snowGolemPos.z);
     } else {
       snowGolemActor?.update?.(dt);
@@ -366,6 +436,7 @@ const qGolem = {
   onTap(hit, ctx) {
     if (
       hit?.targetId?.endsWith('_wait') ||
+      snowHopArc ||
       phase === 'bela_gag' ||
       phase === 'kai_gag' ||
       phase === 'snow_gag' ||
@@ -407,7 +478,7 @@ const qGolem = {
           for (const up of pumpkinUnpicks) up?.();
           emitGag(ctx, 'golem', 'kai_hogs_pumpkins', p.pos);
           phase = 'kai_gag';
-          timers.after(2.0, () => {
+          timers.after(2.4, () => {
             if (phase === 'kai_gag') {
               phase = 'snow';
               ctx?.events?.emit?.('questStep', { id: 'golem', step: 3 });
@@ -425,7 +496,33 @@ const qGolem = {
         hit?.entityId === 'golem_snowman' ||
         (hit?.pos && distXZ(hit.pos, snowGolemPos) <= 2.5)
       ) {
-        // §6.4 Gag 3: Snow golem's pumpkin head boings off -> blushing snowman face!
+        if (snowTaps < 2) {
+          // 1st & 2nd tap: shy Snow Golem gasps and hops across the snowfield clutching its pumpkin hat!
+          snowTaps += 1;
+          snowGolemActor?.setEmote?.('!');
+          snowGolemActor?.setAnim?.('hop');
+          playSfx(ctx, 'boing', { pos: snowGolemPos, pitch: 1.15 });
+          ctx?.fx?.burst?.({ x: snowGolemPos.x, y: snowGolemPos.y + 1.2, z: snowGolemPos.z }, 0xffffff, 8);
+          const hopDestinations = [
+            { x: 38.5, y: 8, z: 8.5 },
+            { x: 46.5, y: 8, z: 13.5 },
+            { x: 37.5, y: 8, z: 19.5 },
+          ];
+          let dest = hopDestinations[0];
+          for (const hd of hopDestinations) {
+            if (distXZ(snowGolemPos, hd) > distXZ(snowGolemPos, dest)) dest = hd;
+          }
+          snowHopArc = {
+            from: { ...snowGolemPos },
+            to: dest,
+            elapsed: 0,
+            duration: 0.72,
+          };
+          return true;
+        }
+
+        // 3rd tap (§6.4 Gag 3): Snow golem's pumpkin head boings off -> blushing snowman face!
+        snowTaps += 1;
         snowGolemActor?.popHead?.();
         snowGolemActor?.setEmote?.('😳');
         snowGolemActor?.setAnim?.('shrug');
@@ -433,18 +530,24 @@ const qGolem = {
         playSfx(ctx, 'boing', { pos: snowGolemPos, pitch: 1.25 });
         playSfx(ctx, 'xp', { pos: snowGolemPos, pitch: 1.3 });
         ctx?.fx?.burst?.({ x: snowGolemPos.x, y: snowGolemPos.y + 1.6, z: snowGolemPos.z }, 0xe38a1d, 12);
-        ctx?.fx?.sparkles?.(snowGolemPos, 10, { toPlayer: true });
+        ctx?.fx?.sparkles?.(snowGolemPos, 10, { toPlayer: false });
         emitGag(ctx, 'golem', 'snow_head_pop', snowGolemPos);
 
         phase = 'snow_gag';
-        timers.after(1.5, () => {
+        timers.after(2.2, () => {
           if (phase === 'snow_gag') {
-            phase = 'altar';
-            spawnAltarSlots(ctx);
-            ctx?.events?.emit?.('questStep', { id: 'golem', step: 4 });
+            phase = 'pickup_pumpkin';
+            spawnDroppedSnowPumpkin(ctx);
           }
         });
         return true;
+      }
+      return false;
+    }
+
+    if (phase === 'pickup_pumpkin') {
+      if (droppedPumpkin && !droppedPumpkin.collected && droppedPumpkin.matchesHit(hit)) {
+        return droppedPumpkin.collect(ctx);
       }
       return false;
     }
@@ -459,7 +562,7 @@ const qGolem = {
     if (phase === 'poppy') {
       if (
         hit?.targetId === 'golem_poppy' ||
-        (hit?.pos && distXZ(hit.pos, { x: altarBase.x, z: altarBase.z + 0.85 }) <= 2.5)
+        (hit?.pos && distXZ(hit.pos, { x: altarBase.x, z: altarBase.z - 0.85 }) <= 2.5)
       ) {
         acceptPoppyAndFinish(ctx);
         return true;
@@ -471,6 +574,10 @@ const qGolem = {
   },
 
   onAction(ctx) {},
+
+  introPos(ctx) {
+    return { x: 81.5, y: 9.0, z: 45.5 };
+  },
 
   targets(ctx) {
     if (phase === 'mine') {
@@ -508,7 +615,7 @@ const qGolem = {
       return [
         {
           id: 'golem_kai_wait',
-          pos: { x: 78.5, y: 8.8, z: 20.5 },
+          pos: { x: 75.5, y: 8.8, z: 24.5 },
           kind: 'wait',
           label: '小凯抢南瓜',
           range: 2.5,
@@ -516,6 +623,18 @@ const qGolem = {
       ];
     }
     if (phase === 'snow') {
+      if (snowHopArc) {
+        const pp = playerPos(ctx);
+        return [
+          {
+            id: 'golem_snow_hop_wait',
+            pos: { x: pp.x, y: pp.y + 0.8, z: pp.z },
+            kind: 'wait',
+            label: '追雪傀儡',
+            range: 2.5,
+          },
+        ];
+      }
       return [
         {
           id: 'golem_snowman',
@@ -537,6 +656,10 @@ const qGolem = {
         },
       ];
     }
+    if (phase === 'pickup_pumpkin' && droppedPumpkin && !droppedPumpkin.collected) {
+      const dtgt = droppedPumpkin.target();
+      if (dtgt) return [dtgt];
+    }
     if (phase === 'altar') {
       const t = altarSlots.map((sl) => sl.target()).filter(Boolean);
       if (t.length > 0) return t;
@@ -545,7 +668,7 @@ const qGolem = {
       return [
         {
           id: 'golem_poppy',
-          pos: { x: altarBase.x, y: altarBase.y + 1.15, z: altarBase.z + 0.85 },
+          pos: { x: altarBase.x, y: altarBase.y + 1.15, z: altarBase.z - 0.85 },
           kind: 'entity',
           label: '收下小红花',
           range: 2.4,
@@ -568,14 +691,24 @@ const qGolem = {
     return { x: first.x, y: (first.y ?? 8) + 0.9, z: first.z };
   },
 
+  // #155 G2: strict per-step objective icon + have/need (zero lumped totals)
   objective(ctx) {
-    if (phase === 'mine' || phase === 'statue' || phase === 'bela_gag') {
-      return { icon: '🔩', have: Math.min(ironHave, 4), need: 4 };
+    if (phase === 'mine') {
+      return { icon: '⛏️', have: Math.min(oresBroken, 2), need: 2 };
     }
-    if (phase === 'pumpkin' || phase === 'kai_gag' || phase === 'snow' || phase === 'snow_gag') {
-      return { icon: '🎃', have: phase === 'snow_gag' ? 1 : 0, need: 1 };
+    if (phase === 'statue' || phase === 'bela_gag') {
+      return { icon: '🔩', have: Math.min(statueBorrowed, 2), need: 2 };
     }
-    return { icon: '🤖', have: Math.min(slotsPlaced, 5), need: 5 };
+    if (phase === 'pumpkin' || phase === 'kai_gag') {
+      return { icon: '🎃', have: Math.min(pumpkinsTried, PUMPKIN_SPOTS.length), need: PUMPKIN_SPOTS.length };
+    }
+    if (phase === 'snow' || phase === 'snow_gag' || phase === 'pickup_pumpkin') {
+      return { icon: '⛄', have: hasSnowPumpkin ? 1 : 0, need: 1 };
+    }
+    if (phase === 'altar' || phase === 'rumble') {
+      return { icon: '🏗️', have: Math.min(slotsPlaced, 5), need: 5 };
+    }
+    return { icon: '🌹', have: phase === 'done_anim' ? 1 : 0, need: 1 };
   },
 
   action(ctx) {
@@ -600,6 +733,9 @@ const qGolem = {
     snowGolemUnpick?.();
     snowGolemUnpick = null;
     snowPatrol = null;
+    snowHopArc = null;
+    droppedPumpkin?.destroy?.();
+    droppedPumpkin = null;
     if (snowGolemActor?.group) detachFromScene(snowGolemActor.group);
     snowGolemActor = null;
     if (belaActor?.group) detachFromScene(belaActor.group);

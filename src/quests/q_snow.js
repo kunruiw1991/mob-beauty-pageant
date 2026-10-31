@@ -620,6 +620,10 @@ const qSnow = {
     return { icon: '❄️', have: Math.min(hits, TOTAL_HITS), need: TOTAL_HITS };
   },
 
+  introPos() {
+    return { x: 54.4, y: center.y ?? 8, z: 16.2 };
+  },
+
   action() {
     return null;
   },

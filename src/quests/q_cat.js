@@ -25,7 +25,7 @@ import {
 
 const SNEAK_RADIUS = 10.0;
 const SNEAK_SPEED = 1.6;
-const NEED_FISH = 3;
+const NEED_FISH = 4;
 
 let catActor = null;
 let catUnpick = null;
@@ -35,15 +35,16 @@ let fishGroup = null;
 let hatGiftGroup = null;
 let timers = null;
 
-// 3 jungle perches across the SW clearing (~14-20b apart; perch 0 is 17.2b from start (36.5, 67.5) >= 12b!)
+// 4 lush green-grass jungle perches across the SW clearing (~14-20b apart; perch 0 is 13.9b from start >= 12b!)
 const LOG_SPOTS = [
-  { x: 26.5, y: 8.0, z: 81.5 },
-  { x: 18.5, y: 8.0, z: 69.5 },
-  { x: 34.5, y: 8.0, z: 81.5 },
+  { x: 24.5, y: 8.0, z: 74.5 },
+  { x: 42.5, y: 8.0, z: 66.5 },
+  { x: 24.5, y: 8.0, z: 72.5 },
+  { x: 40.5, y: 8.0, z: 76.5 },
 ];
 
 let logIndex = 0;
-let catPos = { x: 26.5, y: 8.0, z: 81.5 };
+let catPos = { x: 24.5, y: 8.0, z: 74.5 };
 let lookState = 'away'; // 'away' | 'tell' | 'peek'
 let stateTimer = 3.4;
 let peekGrace = 0;
@@ -83,8 +84,8 @@ function buildStolenKaiHatProp() {
 function setLookPhase(ctx, nextPhase) {
   lookState = nextPhase;
   if (nextPhase === 'away') {
-    // Peeks occur every ~3.0 - 3.7 s (away 2.4-3.1s + tell 0.6s, #143: 3-5 s)
-    stateTimer = rngRange(ctx, 2.4, 3.1);
+    // Peeks occur every ~2.6 - 3.1 s (cycle ~4.1 - 4.6 s, right inside #143 3-5 s!)
+    stateTimer = rngRange(ctx, 2.0, 2.48);
     catActor?.setEmote?.(null);
     catActor?.setAnim?.('idle');
     const pp = playerPos(ctx);
@@ -103,7 +104,7 @@ function setLookPhase(ctx, nextPhase) {
       ringMesh.material = sharedBasicMat(0xfcc419, { opacity: 0.6, transparent: true });
     }
   } else if (nextPhase === 'peek') {
-    stateTimer = 1.45;
+    stateTimer = 1.5;
     peekGrace = 0.08;
     catActor?.setEmote?.('👀');
     catActor?.lookAt?.(playerPos(ctx));
@@ -202,13 +203,13 @@ function feedOneFish(ctx) {
       hatGiftGroup.visible = true;
       ctx?.fx?.sparkles?.({ x: gx, y: gy + 0.5, z: gz }, 12, { toPlayer: true });
     }
-    const kaiCameoPos = { x: 26.5, y: 8, z: 75.5 };
+    const kaiCameoPos = { x: 34.5, y: 8, z: 72.5 };
     ctx?.rival?.loseHatCameo?.(kaiCameoPos, 'cat');
     catActor?.setAnim?.('cheer');
     emitGag(ctx, 'cat', 'cat_gift_kai_hat', catPos);
   });
 
-  timers.after(1.2, () => {
+  timers.after(1.85, () => {
     ctx?.quests?.complete?.('cat');
   });
 }
@@ -297,7 +298,7 @@ const qCat = {
         hitRadius: 1.2,
       });
 
-      const ambPos = { x: 25.5, y: 8, z: 73.5 };
+      const ambPos = { x: 30.5, y: 8, z: 70.5 };
       ambientCat = acquireActor(ctx, 'q_cat:ambient', 'catMob', { pos: ambPos, anim: 'idle' });
     }
 
@@ -307,7 +308,9 @@ const qCat = {
     hatGiftGroup = buildStolenKaiHatProp();
     attachToScene(ctx, hatGiftGroup);
 
-    setLookPhase(ctx, 'away');
+    // Open with a brief alert peek so player immediately sees 喵喵's red-light mechanic!
+    setLookPhase(ctx, 'peek');
+    stateTimer = 1.05;
   },
 
   update(dt, ctx) {
@@ -445,6 +448,10 @@ const qCat = {
   },
 
   onAction(ctx) {},
+
+  introPos(ctx) {
+    return { x: catPos.x, y: catPos.y + 0.9, z: catPos.z };
+  },
 
   targets(ctx) {
     if (finishing) {

@@ -1,3 +1,4 @@
+import * as THREE from '../../vendor/three.module.min.js';
 import { B, BLOCK_PROPS, getBlockProps, blockColor } from './blocks.js';
 import { createTextures } from './textures.js';
 import { WX, WY, WZ, CHUNK_SIZE, createChunkManager } from './chunks.js';
@@ -192,6 +193,134 @@ export function createWorld(ctx = {}) {
 
   const nav = createNav({ isWalkable, surfaceY });
 
+  // End ambient life (#155 W1): 56 floating purple particles (1 InstancedMesh) + 4 wandering endermanMob actors
+  const endAmbientGroup = new THREE.Group();
+  endAmbientGroup.name = 'endAmbient';
+  endAmbientGroup.visible = false;
+  if (ctx?.scene) {
+    ctx.scene.add(endAmbientGroup);
+  }
+
+  const END_MOTE_COUNT = 56;
+  const endMoteGeo = new THREE.BoxGeometry(0.18, 0.18, 0.18);
+  const endMoteMat = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0.9,
+    toneMapped: false,
+    fog: false,
+  });
+  const endMotes = new THREE.InstancedMesh(endMoteGeo, endMoteMat, END_MOTE_COUNT);
+  endMotes.frustumCulled = false;
+  endMotes.name = 'endPurpleParticles';
+  const endMoteSpecs = [];
+  const motePalette = [
+    new THREE.Color(0xe879f9),
+    new THREE.Color(0xc084fc),
+    new THREE.Color(0xa855f7),
+    new THREE.Color(0xf5d0fe),
+  ];
+  let moteSeed = 0x9e3779b9;
+  const nextMoteRnd = () => {
+    moteSeed = (moteSeed * 1664525 + 1013904223) >>> 0;
+    return moteSeed / 4294967296;
+  };
+  for (let i = 0; i < END_MOTE_COUNT; i++) {
+    const ang = nextMoteRnd() * Math.PI * 2;
+    const rad = 2.0 + Math.sqrt(nextMoteRnd()) * 15.5;
+    endMoteSpecs.push({
+      x: 152 + Math.cos(ang) * rad,
+      yBase: 8.4 + nextMoteRnd() * 5.2,
+      z: 41 + Math.sin(ang) * rad,
+      phase: nextMoteRnd() * Math.PI * 2,
+      speed: 0.7 + nextMoteRnd() * 0.9,
+      scale: 0.75 + nextMoteRnd() * 0.85,
+    });
+    endMotes.setColorAt(i, motePalette[i % motePalette.length]);
+  }
+  if (endMotes.instanceColor) endMotes.instanceColor.needsUpdate = true;
+  endAmbientGroup.add(endMotes);
+  const moteDummy = new THREE.Object3D();
+
+  const END_WANDER_ROUTES = [
+    { cx: 148.6, cz: 48.0, rx: 3.1, rz: 2.3, speed: 0.62, phase: 0.0 },
+    { cx: 155.8, cz: 45.6, rx: 2.7, rz: 2.9, speed: 0.54, phase: 1.7 },
+    { cx: 148.2, cz: 33.8, rx: 2.6, rz: 1.9, speed: 0.66, phase: 3.2 },
+    { cx: 156.2, cz: 32.8, rx: 2.4, rz: 2.2, speed: 0.58, phase: 4.8 },
+  ];
+  let endermenSpawned = false;
+  const endermen = [];
+
+  function ensureEndermen() {
+    if (endermenSpawned || typeof ctx?.chars?.create !== 'function') return;
+    endermenSpawned = true;
+    for (let i = 0; i < END_WANDER_ROUTES.length; i++) {
+      const r = END_WANDER_ROUTES[i];
+      const actor = ctx.chars.create('endermanMob', { id: `end_wander_${i}` });
+      if (!actor?.group) continue;
+      actor.group.position.set(r.cx + r.rx, 8, r.cz);
+      endAmbientGroup.add(actor.group);
+      endermen.push({ actor, route: r, lastX: r.cx + r.rx, lastZ: r.cz });
+    }
+  }
+
+  function updateEndAmbient(simTime, dt) {
+    ensureEndermen();
+    if (currentArea !== 'end') return;
+
+    for (let i = 0; i < END_MOTE_COUNT; i++) {
+      const m = endMoteSpecs[i];
+      const t = simTime * m.speed + m.phase;
+      const rise = ((t * 0.55) % 3.6);
+      moteDummy.position.set(
+        m.x + Math.sin(t * 0.9) * 0.45,
+        m.yBase + rise,
+        m.z + Math.cos(t * 0.85) * 0.45
+      );
+      moteDummy.rotation.set(t * 0.8, t * 1.1, 0);
+      const pulse = m.scale * (0.75 + 0.3 * Math.sin(t * 2.4));
+      moteDummy.scale.setScalar(pulse);
+      moteDummy.updateMatrix();
+      endMotes.setMatrixAt(i, moteDummy.matrix);
+    }
+    endMotes.instanceMatrix.needsUpdate = true;
+
+    for (let i = 0; i < endermen.length; i++) {
+      const e = endermen[i];
+      const r = e.route;
+      // Walk 3.6s then pause/look-around 1.2s deterministically
+      const cyclePeriod = 4.8;
+      const rawT = simTime + r.phase * 1.5;
+      const cyc = Math.floor(rawT / cyclePeriod);
+      const rem = rawT - cyc * cyclePeriod;
+      const walkProgress = cyc * 3.6 + Math.min(3.6, rem);
+      const ang = walkProgress * r.speed * 0.45 + r.phase;
+      let nx = r.cx + Math.cos(ang) * r.rx;
+      let nz = r.cz + Math.sin(ang * 2.0) * r.rz * 0.65;
+      if (!isWalkable(Math.floor(nx), 8, Math.floor(nz))) {
+        nx = r.cx;
+        nz = r.cz;
+      }
+      const walking = rem < 3.6;
+
+      e.actor.group.position.set(nx, 8, nz);
+      if (walking) {
+        const dx = nx - e.lastX;
+        const dz = nz - e.lastZ;
+        if (dx * dx + dz * dz > 1e-6) {
+          e.actor.group.rotation.y = Math.atan2(dx, dz);
+        }
+        e.actor.setAnim?.('walk');
+      } else {
+        e.actor.group.rotation.y += Math.sin(simTime * 3.0 + i) * 0.025;
+        e.actor.setAnim?.('idle');
+      }
+      e.lastX = nx;
+      e.lastZ = nz;
+      e.actor.update?.(dt);
+    }
+  }
+
   function setArea(area) {
     currentArea = area === 'end' || area === 'nether' ? area : 'hub';
     chunkMgr.setArea(currentArea);
@@ -199,6 +328,10 @@ export function createWorld(ctx = {}) {
     water.setArea(currentArea);
     portals.setArea(currentArea);
     boardWall.setArea(currentArea);
+    endAmbientGroup.visible = currentArea === 'end';
+    if (currentArea === 'end') {
+      updateEndAmbient(localSimTime, 0);
+    }
   }
 
   function* buildSteps() {
@@ -274,6 +407,7 @@ export function createWorld(ctx = {}) {
     water.update(dt);
     portals.update(dt);
     textures.update(localSimTime);
+    updateEndAmbient(localSimTime, dt);
   }
 
   return {

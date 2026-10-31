@@ -225,8 +225,8 @@ const qSlime = {
     // Summon 3 big slimes across the NW, E, and S swamp banks so player chases them around the pond!
     const bigSpots = [
       { x: 60.5, z: 60.5 },
-      { x: 78.5, z: 68.5 },
-      { x: 68.5, z: 82.5 },
+      { x: 78.5, z: 66.5 },
+      { x: 60.5, z: 82.5 },
     ];
     for (const sp of bigSpots) {
       slimes.push(
@@ -275,14 +275,14 @@ const qSlime = {
         const dxToP = s.pos.x - pp.x;
         const dzToP = s.pos.z - pp.z;
         const dToP = Math.hypot(dxToP, dzToP);
-        if (s.size === 1 && s.fleeCount < 3 && dToP < 4.8 && s.hopTimer > 0.14) {
+        if (s.size === 1 && s.fleeCount < 4 && dToP < 4.8 && s.hopTimer > 0.14) {
           s.hopTimer = 0.12;
         }
         s.hopTimer -= dt;
         if (s.hopTimer <= 0) {
           if (s.size === 1) {
-            // Small slimes actively FLEE away from player (softening after 3 flee hops for F2 mercy!)
-            const tired = s.fleeCount >= 3;
+            // Small slimes actively FLEE away from player (softening after 4 flee hops for F2 mercy!)
+            const tired = s.fleeCount >= 4;
             s.hopTimer = tired ? rngRange(ctx, 1.35, 1.75) : rngRange(ctx, 0.82, 1.15);
             const hopDist = tired ? 1.0 : dToP < 7.0 ? 2.95 : 1.9;
             const dest = stepWalkableSwamp(ctx, s.pos, dxToP || 1, dzToP || 0.5, hopDist);
@@ -471,7 +471,7 @@ const qSlime = {
         playSfx(ctx, 'xp', { pos: headDest, pitch: 1.4 });
         emitGag(ctx, 'slime', 'slime_pet', headDest);
       });
-      timers.after(1.1, () => {
+      timers.after(1.8, () => {
         ctx?.quests?.complete?.('slime');
       });
       return true;
@@ -486,6 +486,10 @@ const qSlime = {
 
   onAction(ctx) {},
 
+  introPos(ctx) {
+    return { x: boboPos.x, y: boboPos.y + 1.0, z: boboPos.z };
+  },
+
   targets(ctx) {
     if (finishing) {
       return [
@@ -499,8 +503,12 @@ const qSlime = {
       ];
     }
     const pPos = playerPos(ctx);
-    const ready = slimes
-      .filter((s) => s.alive && s.invuln <= 0.05)
+    const readyAll = slimes.filter((s) => s.alive && s.invuln <= 0.05);
+    const pool =
+      bigSplits < 3 && readyAll.some((s) => s.size === 2)
+        ? readyAll.filter((s) => s.size === 2)
+        : readyAll;
+    const ready = pool
       .sort((a, b) => distXZ(a.pos, pPos) - distXZ(b.pos, pPos))
       .map((s) => {
         const aim = s.hopArc ? s.hopArc.to : s.pos;
@@ -534,7 +542,10 @@ const qSlime = {
   },
 
   objective(ctx) {
-    return { icon: '🟢', have: Math.min(tapsDone, TOTAL_TAPS_NEEDED), need: TOTAL_TAPS_NEEDED };
+    if (bigSplits < 3) {
+      return { icon: '🟢', have: Math.min(3, bigSplits), need: 3 };
+    }
+    return { icon: '🫧', have: finishing ? 6 : Math.min(6, smallCleared), need: 6 };
   },
 
   action(ctx) {

@@ -370,6 +370,10 @@ def t08_world_poi_areas_and_zero_dead_taps(sess: QASession) -> None:
         if (edgeArrow) {{
           const r = edgeArrow.getBoundingClientRect();
           arrowRect = {{ w: Math.round(r.width), h: Math.round(r.height), x: Math.round(r.left), y: Math.round(r.top) }};
+          const cx = r.left + r.width * 0.5;
+          const cy = r.top + r.height * 0.5;
+          edgeArrow.dispatchEvent(new PointerEvent('pointerdown', {{ bubbles: true, clientX: cx, clientY: cy, isPrimary: true }}));
+          edgeArrow.dispatchEvent(new PointerEvent('pointerup', {{ bubbles: true, clientX: cx, clientY: cy, isPrimary: true }}));
           edgeArrow.click();
           for (let k = 0; k < 6; k++) await Promise.resolve();
           P.stepFrames(12);
@@ -431,6 +435,9 @@ def _verify_main_quest(sess: QASession, quest_id: str, seed: int = 12) -> dict[s
   )
   assert len(ep['gags']) >= 1, (
       f"@{meta['owner']}: quest '{quest_id}' completed with 0 gags recorded (expected {meta['gags']}): {ep}"
+  )
+  assert ep.get('gagCamCount', 0) >= 1 and ep.get('lastGag'), (
+      f"@core/@{meta['owner']}: #155 G1 state.gagCam not triggered on quest '{quest_id}': {ep}"
   )
   assert ep['pointerSamples'] > 0 and ep['pointerNulls'] == 0, (
       f"@{meta['owner']}: quest '{quest_id}' had null quest.pointer at frame {ep['firstNullFrame']}: {ep}"
@@ -822,11 +829,30 @@ def t29_final_leaderboard_stars_share_png_replay_continue(sess: QASession) -> No
             return cs.display !== 'none' && cs.visibility !== 'hidden' && r.width > 20 && r.height > 20;
           })
           .map((b) => (b.textContent || '').trim());
+        const finalRoot = document.getElementById('final') || document.body;
+        const cardRects = Array.from(
+          finalRoot.querySelectorAll('[data-contestant], [data-card-id], .final-card, .polaroid-card, .board-card')
+        )
+          .filter((el) => {
+            const cs = window.getComputedStyle(el);
+            const r = el.getBoundingClientRect();
+            return cs.display !== 'none' && cs.visibility !== 'hidden' && r.width > 20 && r.height > 20;
+          })
+          .map((el) => {
+            const r = el.getBoundingClientRect();
+            return { w: Math.round(r.width), h: Math.round(r.height) };
+          });
+        const minCardSide = cardRects.length
+          ? Math.min(...cardRects.map((c) => Math.max(c.w, c.h)))
+          : 0;
         return {
           scene: P.getState().scene,
           hasShare: btns.some((t) => /分享|share/i.test(t)),
           hasReplay: btns.some((t) => /再来一次|重新|replay/i.test(t)),
           hasContinueHunt: btns.some((t) => /继续找|探索|continue/i.test(t)),
+          cardCount: cardRects.length,
+          minCardSide,
+          sampleCard: cardRects[0] || null,
           buttons: btns,
           bodySnippet: txt.slice(0, 120),
         };
@@ -834,6 +860,9 @@ def t29_final_leaderboard_stars_share_png_replay_continue(sess: QASession) -> No
   )
   assert res['hasShare'] and res['hasReplay'] and res['hasContinueHunt'], (
       f'@pageant-ui: final screen missing 分享 / 再来一次 / 继续找 buttons (§8.5): {res}'
+  )
+  assert res['cardCount'] > 0 and res['minCardSide'] >= 96, (
+      f'@pageant-ui: #155 P2 final 排行榜 cards must be >= 96px at 1280x800: {res}'
   )
   sess.assert_clean('T29')
 

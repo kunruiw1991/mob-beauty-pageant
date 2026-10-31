@@ -313,7 +313,6 @@ export function createBoothUI(ctx = {}, hooks = {}) {
     snapBtn._resetTapDebounce?.();
 
     if (ctx.state) ctx.state.scene = 'booth';
-    hooks.onOpen?.();
 
     const actor = findContestantActor(id);
     actor?.clearAccessories?.();
@@ -351,6 +350,7 @@ export function createBoothUI(ctx = {}, hooks = {}) {
         result: null,
         resolve,
       };
+      hooks.onOpen?.();
       refreshBoothVisuals();
     });
   }
@@ -390,7 +390,7 @@ export function createBoothUI(ctx = {}, hooks = {}) {
     snap,
     hide,
     cancel,
-    isActive: () => Boolean(session),
+    isActive: () => Boolean(session) || (!overlay.hidden && !overlay.classList.contains('ui-hidden')),
     update,
   };
 }

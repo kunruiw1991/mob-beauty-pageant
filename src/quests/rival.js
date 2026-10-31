@@ -290,17 +290,12 @@ export function createRival(ctx) {
   finaleJunkGroup.visible = false;
   let speechBubble = null;
   {
-    // Pumpkin cap + shoulder snow + foot honey + cheek frosting (§8.5)
-    const crookedPumpkin = new THREE.Mesh(sharedBoxGeo(0.72, 0.55, 0.72), sharedLambertMat(0xf77f00));
-    crookedPumpkin.position.set(0.08, 2.52, 0);
-    crookedPumpkin.rotation.z = -0.22;
+    // Body-level slapstick souvenirs (shoulder snow + foot honey); head hat stack is on actor.setFinaleJunk(true) (#161)
     const snowClump = new THREE.Mesh(sharedBoxGeo(0.42, 0.32, 0.42), sharedLambertMat(0xffffff));
     snowClump.position.set(0.48, 1.42, 0.05);
     const footHoney = new THREE.Mesh(sharedBoxGeo(0.46, 0.24, 0.52), sharedLambertMat(0xf5a623));
     footHoney.position.set(-0.2, 0.12, 0.08);
-    const cheekCake = new THREE.Mesh(sharedBoxGeo(0.32, 0.28, 0.16), sharedLambertMat(0xfff0f5));
-    cheekCake.position.set(-0.28, 1.82, 0.52);
-    finaleJunkGroup.add(crookedPumpkin, snowClump, footHoney, cheekCake);
+    finaleJunkGroup.add(snowClump, footHoney);
   }
 
   function syncState(extra = {}) {
@@ -354,7 +349,7 @@ export function createRival(ctx) {
       headNode.add(cakeFaceGroup, starsGroup);
       speechBubble = getSpeechBubbleSprite('我也要参赛!');
       if (speechBubble) {
-        speechBubble.position.set(0, 3.18, 0);
+        speechBubble.position.set(0, 3.65, 0);
         speechBubble.visible = false;
         actor.group.add(speechBubble);
       }
@@ -371,6 +366,8 @@ export function createRival(ctx) {
     finaleJunkGroup.visible = false;
     coneGroup.visible = false;
     decoyCakeGroup.visible = false;
+    actor?.setFinaleJunk?.(false);
+    actor?.setCakeFace?.(false);
     if (speechBubble) speechBubble.visible = false;
     if (actor?.rig) {
       actor.rig.rotation.set(0, 0, 0);
@@ -533,8 +530,15 @@ export function createRival(ctx) {
     dressForFinale(atPos) {
       rival.appear(atPos, 'finale', 'finale');
       finaleJunkGroup.visible = true;
-      if (speechBubble) speechBubble.visible = true;
-      actor?.setAnim?.('walk');
+      finaleJunkGroup.rotation.set(0, 0, 0);
+      finaleJunkGroup.position.set(0, 0, 0);
+      actor?.setFinaleJunk?.(true);
+      if (speechBubble) {
+        speechBubble.position.set(0, 3.65, 0);
+        speechBubble.visible = true;
+      }
+      if (actor?.group) actor.group.rotation.y = 0; // Face south (+Z) toward runway camera
+      actor?.setAnim?.('strut');
       actor?.setEmote?.(null);
       syncState();
     },
@@ -826,8 +830,13 @@ export function createRival(ctx) {
         }
       } else if (currentMode === 'hog' && actor.rig) {
         actor.rig.position.y = Math.abs(Math.sin(modeTime * 8.5)) * 0.22;
-      } else if (currentMode === 'finale' && speechBubble?.visible) {
-        speechBubble.position.y = 3.18 + Math.sin(modeTime * 5.5) * 0.08;
+      } else if (currentMode === 'finale') {
+        if (actor.group) actor.group.rotation.y = 0; // Always face south (+Z) toward runway camera (#155 C2)
+        finaleJunkGroup.rotation.z = Math.sin(modeTime * 11.5) * 0.12;
+        finaleJunkGroup.position.y = Math.abs(Math.sin(modeTime * 9.0)) * 0.05;
+        if (speechBubble?.visible) {
+          speechBubble.position.y = 3.65 + Math.sin(modeTime * 5.5) * 0.08;
+        }
       }
 
       syncState();

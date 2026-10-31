@@ -1,12 +1,13 @@
-// In-play HUD + master createUI(ctx) aggregator per docs/DESIGN.md §3.7, §8.7 (owner: pageant-ui).
-// HUD in play (<= 3 interactive controls, 0 overlaps across 1280x800, 1024x768, 844x390, 390x844):
+// In-play HUD + master createUI(ctx) aggregator per docs/DESIGN.md §3.7, §8.7 & #149 N3 (owner: pageant-ui).
+// HUD in play (<= 4 interactive controls, 0 overlaps across 1280x800, 1024x768, 844x390, 390x844):
 // - Top-left board chip `3/10` (opens board `view`)
 // - Top-centre non-interactive objective strip (`{icon, have, need}`)
 // - Top-right `⏸` pause button
 // - Bottom-right context action button ONLY when `action != null`
+// - Off-screen beacon edge arrow (`#hud-beacon-btn` >= 72 px) with next contestant's face; hides when on-screen
 
-import { ROSTER } from '../data/roster.js';
-import { bindTap, clampCjk, getVoxelTextures } from './ui_kit.js';
+import { ROSTER, ROSTER_BY_ID, getContestantMeta } from '../data/roster.js';
+import { bindTap, clampCjk, drawContestantChibi2D, getVoxelTextures } from './ui_kit.js';
 import { progress } from './progress.js';
 import { renderPortrait } from './portrait.js';
 import { createTitleUI } from './title.js';
@@ -80,11 +81,158 @@ export function createHudUI(ctx = {}, hooks = {}) {
   actionBadge.hidden = true;
   actionBtn.append(actionIcon, actionBadge);
 
-  hudRoot.append(boardBtn, objStrip, pauseBtn, actionBtn);
+  // 5. Off-screen beacon arrow button (#149 N3: >= 72x72 px, contestant face + bouncing directional arrow)
+  const beaconBtn = document.createElement('button');
+  beaconBtn.type = 'button';
+  beaconBtn.id = 'hud-beacon-btn';
+  beaconBtn.className = 'mc-btn hud-beacon-btn ui-hidden';
+  beaconBtn.hidden = true;
+  beaconBtn.setAttribute('aria-label', '前往目标');
+
+  const beaconInner = document.createElement('span');
+  beaconInner.className = 'hud-beacon-inner';
+
+  const beaconFaceCanvas = document.createElement('canvas');
+  beaconFaceCanvas.width = 56;
+  beaconFaceCanvas.height = 56;
+  beaconFaceCanvas.className = 'hud-beacon-face';
+
+  const beaconArrowPivot = document.createElement('span');
+  beaconArrowPivot.className = 'hud-beacon-arrow-pivot';
+  beaconArrowPivot.setAttribute('aria-hidden', 'true');
+  beaconArrowPivot.innerHTML = `
+    <svg class="hud-beacon-arrow-svg" width="28" height="28" viewBox="0 0 16 16" shape-rendering="crispEdges">
+      <polygon points="2,1 15,8 2,15 5,8" fill="#1b1c24"/>
+      <polygon points="3,3 13,8 3,13 6,8" fill="#ffe64d"/>
+      <polygon points="4,4 11,8 6,8" fill="#ffffff"/>
+    </svg>
+  `;
+
+  beaconInner.append(beaconFaceCanvas, beaconArrowPivot);
+  beaconBtn.appendChild(beaconInner);
+
+  hudRoot.append(boardBtn, objStrip, pauseBtn, actionBtn, beaconBtn);
 
   let currentAction = null;
   let currentActionHandler = null;
   let hudWanted = false;
+  let lastBeaconCid = null;
+  let lastBeaconGuide = null;
+  let tmpFaceSrcCanvas = null;
+
+  function drawBeaconContestantFace(cid) {
+    const safeCid = ROSTER_BY_ID[cid] ? cid : 'sheep';
+    if (lastBeaconCid === safeCid) return;
+    lastBeaconCid = safeCid;
+
+    if (!tmpFaceSrcCanvas) {
+      tmpFaceSrcCanvas = document.createElement('canvas');
+      tmpFaceSrcCanvas.width = 144;
+      tmpFaceSrcCanvas.height = 144;
+    }
+    const sg = tmpFaceSrcCanvas.getContext('2d');
+    sg.imageSmoothingEnabled = false;
+    drawContestantChibi2D(sg, safeCid, [], 144, false);
+
+    const meta = getContestantMeta(safeCid);
+    const fg = beaconFaceCanvas.getContext('2d');
+    fg.imageSmoothingEnabled = false;
+    fg.fillStyle = meta?.colors?.primary || '#fff8eb';
+    fg.fillRect(0, 0, 56, 56);
+    fg.fillStyle = meta?.colors?.secondary || '#ffd43b';
+    fg.fillRect(0, 0, 56, 4);
+    // Tight head+face crop from 144x144 chibi sheet
+    fg.drawImage(tmpFaceSrcCanvas, 24, 10, 96, 96, 2, 3, 52, 52);
+  }
+
+  function resolveBeaconGuide() {
+    if (ctx.state && ctx.state.scene !== 'world') return null;
+    if (typeof ctx.getBeaconGuide === 'function') {
+      return ctx.getBeaconGuide();
+    }
+    const nextId = ctx.quests?.activeId?.() || ctx.quests?.next?.() || null;
+    if (!nextId || typeof ctx.pick?.worldToScreen !== 'function') return null;
+    const list = ctx.quests?.targets?.() || [];
+    const tgt =
+      list.find((t) => String(t.id || '') === `beacon_${nextId}`) ||
+      list.find((t) => String(t.id || '').startsWith('beacon_')) ||
+      list[0] ||
+      null;
+    const pos = tgt?.pos || ctx.state?.quest?.pointer || null;
+    if (!pos) return null;
+    const scr = ctx.pick.worldToScreen(pos);
+    const onScreen = scr.onScreen !== undefined ? Boolean(scr.onScreen) : Boolean(scr.visible);
+    return {
+      id: tgt?.id || `beacon_${nextId}`,
+      targetId: tgt?.id || `beacon_${nextId}`,
+      questId: nextId,
+      contestantId: ROSTER_BY_ID[nextId]?.id || nextId,
+      pos,
+      sx: scr.sx,
+      sy: scr.sy,
+      onScreen,
+      angle: scr.angle ?? Math.atan2((scr.sy ?? 400) - (window.innerHeight || 800) * 0.5, (scr.sx ?? 640) - (window.innerWidth || 1280) * 0.5),
+    };
+  }
+
+  function hideBeaconArrow() {
+    lastBeaconGuide = null;
+    if (!beaconBtn.hidden) {
+      beaconBtn.hidden = true;
+      beaconBtn.classList.add('ui-hidden');
+    }
+  }
+
+  function syncBeacon(guideArg) {
+    if (guideArg === null || hudRoot.hidden || (ctx.state && ctx.state.scene !== 'world')) {
+      hideBeaconArrow();
+      return;
+    }
+    const guide = guideArg !== undefined ? guideArg : resolveBeaconGuide();
+    if (!guide || guide.onScreen) {
+      hideBeaconArrow();
+      return;
+    }
+
+    lastBeaconGuide = guide;
+    drawBeaconContestantFace(guide.contestantId || guide.questId || 'sheep');
+
+    const vw = window.innerWidth || 1280;
+    const vh = window.innerHeight || 800;
+    const half = 40; // 80x80 px button (>= 72 px)
+    const minCx = half + 22;
+    const maxCx = Math.max(minCx, vw - half - 22);
+    // Keep top >= 90 px so beacon arrow NEVER overlaps top HUD bar (#hud-board-btn / #hud-objective / #hud-pause-btn)
+    const minCy = 134;
+    const maxCy = Math.max(minCy, vh - half - 22);
+
+    let cx = Math.min(maxCx, Math.max(minCx, Number(guide.sx) || vw * 0.5));
+    let cy = Math.min(maxCy, Math.max(minCy, Number(guide.sy) || vh * 0.5));
+
+    // Keep clear of bottom-right context action button when visible
+    if (!actionBtn.hidden && cx > vw - 156 && cy > vh - 156) {
+      cx = Math.max(minCx, vw - 156);
+    }
+
+    const angle = Number.isFinite(guide.angle)
+      ? guide.angle
+      : Math.atan2(cy - vh * 0.5, cx - vw * 0.5);
+    const deg = Math.round((angle * 180) / Math.PI);
+    const bdx = (Math.cos(angle) * 3.5).toFixed(1);
+    const bdy = (Math.sin(angle) * 3.5).toFixed(1);
+
+    beaconBtn.style.left = `${Math.round(cx - half)}px`;
+    beaconBtn.style.top = `${Math.round(cy - half)}px`;
+    beaconArrowPivot.style.transform = `rotate(${deg}deg)`;
+    beaconInner.style.setProperty('--beacon-dx', `${bdx}px`);
+    beaconInner.style.setProperty('--beacon-dy', `${bdy}px`);
+
+    if (beaconBtn.hidden) {
+      beaconBtn._resetTapDebounce?.();
+      beaconBtn.hidden = false;
+      beaconBtn.classList.remove('ui-hidden');
+    }
+  }
 
   bindTap(boardBtn, () => {
     hooks.onOpenBoardView?.();
@@ -97,6 +245,35 @@ export function createHudUI(ctx = {}, hooks = {}) {
   bindTap(actionBtn, () => {
     pressAction();
   }, { ctx, sfx: 'pop' });
+
+  bindTap(beaconBtn, () => {
+    if (
+      typeof ctx.walkToBeacon === 'function' &&
+      typeof ctx.player?.isMoving === 'function'
+    ) {
+      try {
+        if (ctx.walkToBeacon()) return;
+      } catch (_) {}
+    }
+    const guide = lastBeaconGuide || resolveBeaconGuide();
+    const tid = guide?.targetId;
+    if (tid && typeof window.__PAGEANT__?.tapTarget === 'function' && window.__PAGEANT__.tapTarget(tid)) {
+      if (!ctx.state?.player?.moving && guide?.pos && typeof ctx.player?.walkTo === 'function') {
+        ctx.player.walkTo(guide.pos, { maxSearchR: 6, allowClamp: true });
+      }
+      return;
+    }
+    if (tid && typeof ctx.quests?.tapTarget === 'function' && ctx.quests.tapTarget(tid)) {
+      return;
+    }
+    if (guide?.pos && typeof ctx.player?.walkTo === 'function') {
+      ctx.player.walkTo(guide.pos, { maxSearchR: 6, allowClamp: true });
+    }
+  }, { ctx, sfx: 'pop' });
+
+  window.addEventListener('resize', () => {
+    if (!hudRoot.hidden) syncBeacon();
+  });
 
   function update(state) {
     const st = state || ctx.state;
@@ -112,6 +289,7 @@ export function createHudUI(ctx = {}, hooks = {}) {
       }
     }
     countSpan.textContent = hiddenRanked > 0 ? `${mainRanked}/10★${hiddenRanked}` : `${mainRanked}/10`;
+    syncBeacon();
   }
 
   function setObjective(obj) {
@@ -141,6 +319,7 @@ export function createHudUI(ctx = {}, hooks = {}) {
       currentActionHandler = null;
       actionBtn.hidden = true;
       actionBtn.classList.add('ui-hidden');
+      if (!hudRoot.hidden) syncBeacon();
       return;
     }
     currentAction = act;
@@ -157,6 +336,7 @@ export function createHudUI(ctx = {}, hooks = {}) {
     actionBtn._resetTapDebounce?.();
     actionBtn.hidden = false;
     actionBtn.classList.remove('ui-hidden');
+    if (!hudRoot.hidden) syncBeacon();
   }
 
   function pressAction() {
@@ -182,7 +362,10 @@ export function createHudUI(ctx = {}, hooks = {}) {
       boardBtn._resetTapDebounce?.();
       pauseBtn._resetTapDebounce?.();
       actionBtn._resetTapDebounce?.();
+      beaconBtn._resetTapDebounce?.();
       update(ctx.state);
+    } else {
+      hideBeaconArrow();
     }
   }
 
@@ -200,6 +383,7 @@ export function createHudUI(ctx = {}, hooks = {}) {
     show,
     syncModalMask,
     update,
+    syncBeacon,
     setObjective,
     setAction,
     pressAction,
@@ -388,10 +572,10 @@ export function createUI(ctx = {}) {
     });
   }
 
-  // Fallback rAF ticker ONLY for standalone pages without core's fixed-step loop.
-  // Once core calls ui.update(dt), sim time exclusively drives UI timers (100% deterministic F11).
   let hasExternalSimLoop = Boolean(ctx.loop || ctx.rankContestant);
   let lastRafTime = performance.now();
+  let beaconSyncAcc = 0;
+
   const tickFallback = (now) => {
     if (hasExternalSimLoop) return;
     const dt = Math.min(0.05, Math.max(0, (now - lastRafTime) / 1000));
@@ -400,6 +584,7 @@ export function createUI(ctx = {}) {
     boardUI.update(dt);
     nextUI.update(dt);
     menusUI.update(dt);
+    hudUI.syncBeacon();
     requestAnimationFrame(tickFallback);
   };
   if (!hasExternalSimLoop) {
@@ -441,6 +626,7 @@ export function createUI(ctx = {}) {
       if (b) boardUI.restoreWallFromProgress();
     },
     updateHUD: (state) => hudUI.update(state),
+    updateBeacon: (guide) => hudUI.syncBeacon(guide),
     setObjective: (obj) => hudUI.setObjective(obj),
     setAction: (act, onPress) => hudUI.setAction(act, onPress),
 
@@ -507,6 +693,11 @@ export function createUI(ctx = {}) {
       boardUI.update(dt);
       nextUI.update(dt);
       menusUI.update(dt);
+      beaconSyncAcc += dt;
+      if (beaconSyncAcc >= 0.05) {
+        beaconSyncAcc = 0;
+        hudUI.syncBeacon();
+      }
     },
   };
 

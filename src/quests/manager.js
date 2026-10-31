@@ -39,6 +39,22 @@ export function buildQuestManager(ctx, mainQuests = [], hiddenQuests = [], creat
   const previewUnpicks = new Map();
   let currentPreviewId = null;
 
+  // #155 G2: 1.0 s quest-start camera intro (0.5s '?' cape-flip on plaza podium + 0.5s contestant intro)
+  let introTimer = 0;
+  let introStage = 'none'; // 'cape' | 'contestant' | 'none'
+  let introContestantPos = null;
+
+  function clearIntroFocus() {
+    if (introTimer > 0 || introStage !== 'none') {
+      introTimer = 0;
+      introStage = 'none';
+      introContestantPos = null;
+      if (!ctx?.state?.gagCam?.active) {
+        ctx?.cam?.clearFocus?.();
+      }
+    }
+  }
+
   function ensureState() {
     if (!ctx?.state) return;
     if (!ctx.state.quests) ctx.state.quests = {};
@@ -103,7 +119,7 @@ export function buildQuestManager(ctx, mainQuests = [], hiddenQuests = [], creat
     }
     // East cobblestone approach road leading to the cave hill
     if (q.id === 'golem') {
-      return { x: 60.5, y: 8, z: 48.5 };
+      return { x: 56.5, y: 8, z: 48.5 };
     }
     // NE edge of clearing so approaching 嘶嘶 triggers her 2 shy backoff hops (#143)
     if (q.id === 'creeper') {
@@ -244,6 +260,7 @@ export function buildQuestManager(ctx, mainQuests = [], hiddenQuests = [], creat
     }
 
     pendingTap = null;
+    clearIntroFocus();
     setPlayerSneak(ctx, false);
     hidePreviewActor();
 
@@ -267,6 +284,33 @@ export function buildQuestManager(ctx, mainQuests = [], hiddenQuests = [], creat
     q.start?.(ctx);
     syncActiveState();
 
+    // #155 G2: 1.0 s camera intro on '?' cape flip + contestant
+    const rawIntro = q.introPos?.(ctx) || computeSafePointer(q) || getBeaconStartPos(q);
+    introContestantPos = rawIntro
+      ? { x: rawIntro.x, y: rawIntro.y ?? 9.1, z: rawIntro.z }
+      : null;
+    const curArea = ctx?.state?.area || 'hub';
+    const capeSlot =
+      curArea === 'hub' ? ctx?.chars?.capes?.entries?.get?.(q.contestantId)?.slot : null;
+    if (!ctx?.state?.gagCam?.active && ctx?.cam?.focus) {
+      if (capeSlot?.position) {
+        introTimer = 1.0;
+        introStage = 'cape';
+        ctx.cam.focus(
+          {
+            x: capeSlot.position.x,
+            y: (capeSlot.position.y ?? 8) + 1.35,
+            z: capeSlot.position.z,
+          },
+          { distance: 5.2, height: 2.1, instant: true }
+        );
+      } else if (introContestantPos) {
+        introTimer = 1.0;
+        introStage = 'contestant';
+        ctx.cam.focus(introContestantPos, { distance: 6.0, height: 2.6, instant: true });
+      }
+    }
+
     ctx?.events?.emit?.('questStart', { id: q.id, contestantId: q.contestantId });
     playSfx(ctx, 'pickup', { pos: playerPos(ctx), pitch: 1.15 });
     return true;
@@ -285,6 +329,7 @@ export function buildQuestManager(ctx, mainQuests = [], hiddenQuests = [], creat
     const elapsedMs = Math.max(1, Math.round((simTime(ctx) - activeStartedSec) * 1000));
     const finishPos = computeSafePointer(q) || playerPos(ctx);
 
+    clearIntroFocus();
     if (wasActive) {
       try {
         q.cleanup?.(ctx);
@@ -536,7 +581,7 @@ export function buildQuestManager(ctx, mainQuests = [], hiddenQuests = [], creat
     if (questId === 'dragon') {
       spawnPos = { x: 150.5, y: 8, z: 30.5 };
     } else if (questId === 'golem') {
-      spawnPos = { x: 60.5, y: 8, z: 48.5 };
+      spawnPos = { x: 56.5, y: 8, z: 48.5 };
     } else if (questId === 'cat') {
       spawnPos = { x: 36.5, y: 8, z: 67.5 };
     } else if (questId === 'creeper') {
@@ -562,6 +607,7 @@ export function buildQuestManager(ctx, mainQuests = [], hiddenQuests = [], creat
       activeQuest = null;
     }
     pendingTap = null;
+    clearIntroFocus();
     setPlayerSneak(ctx, false);
     hidePreviewActor();
     lastObjSig = '';
@@ -678,6 +724,22 @@ export function buildQuestManager(ctx, mainQuests = [], hiddenQuests = [], creat
 
     if (activeQuest) {
       hidePreviewActor();
+      if (introTimer > 0) {
+        introTimer = Math.max(0, introTimer - dt);
+        if (introStage === 'cape' && introTimer <= 0.5 && introContestantPos) {
+          introStage = 'contestant';
+          const liveIntro = activeQuest.introPos?.(ctx) || introContestantPos;
+          if (!ctx?.state?.gagCam?.active) {
+            ctx?.cam?.focus?.(
+              { x: liveIntro.x, y: liveIntro.y ?? 9.1, z: liveIntro.z },
+              { distance: 6.0, height: 2.6, instant: true }
+            );
+          }
+        }
+        if (introTimer <= 0) {
+          clearIntroFocus();
+        }
+      }
       activeQuest.update?.(dt, ctx);
       if (activeQuest) {
         syncActiveState();

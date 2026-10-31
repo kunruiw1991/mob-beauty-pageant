@@ -313,6 +313,10 @@ const qSheep = {
 
   onAction(ctx) {},
 
+  introPos(ctx) {
+    return { x: sheepPos.x, y: sheepPos.y + 1.0, z: sheepPos.z };
+  },
+
   targets(ctx) {
     if (finishing) {
       return [
@@ -366,7 +370,10 @@ const qSheep = {
   },
 
   objective(ctx) {
-    return { icon: '🌸', have: Math.min(pickedCount, NEED_FLOWERS), need: NEED_FLOWERS };
+    if (pickedCount < NEED_FLOWERS) {
+      return { icon: '🌸', have: pickedCount, need: NEED_FLOWERS };
+    }
+    return { icon: '💐', have: finishing ? 1 : 0, need: 1 };
   },
 
   action(ctx) {
