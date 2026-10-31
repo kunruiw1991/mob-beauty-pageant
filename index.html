@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>我的世界：生物选美大赛</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%F0%9F%91%91%3C/text%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="./styles/main.css" />
+</head>
+<body>
+  <canvas id="game-canvas"></canvas>
+
+  <div id="hud"></div>
+  <div id="ui"></div>
+
+  <!-- Visible by default for iPad module-failure safety (§1, §8.7); adopted by src/ui/title.js -->
+  <div id="title">
+    <div id="title-logo" style="margin-top:24px;text-align:center;color:#fff;text-shadow:0 4px 0 #1e1e24;">
+      <div style="font-size:20px;font-weight:900;letter-spacing:2px;">⛏️ 我的世界 👑</div>
+      <h1 style="margin:8px 0 0;font-size:38px;font-weight:900;">生物选美大赛</h1>
+    </div>
+    <div id="title-actions" style="margin-bottom:28px;display:flex;gap:16px;align-items:center;">
+      <button type="button" id="btn-title-play" class="mc-btn" aria-label="开始" style="min-width:116px;min-height:116px;font-size:42px;background:#3fae3a;">▶</button>
+    </div>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
