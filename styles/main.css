@@ -1,5 +1,5 @@
 /* ==========================================================================
-   我的世界：生物选美大赛 · Mob Beauty Pageant — styles/main.css
+   Mob Beauty Pageant — styles/main.css
    Owner: pageant-ui
    Binding rules (§1, §8, §11 F12):
    - Zero scrollbars, zero overlaps across 1280x800, 1024x768, 844x390, 390x844
@@ -1288,6 +1288,69 @@ body > canvas {
   min-height: 74px;
 }
 
+/* v1.1 pause grid: Resume (full row) · Music | Sounds | Voice · Leaderboard | Restart */
+.pause-grid.pause-grid-v11 {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.pause-grid-v11 .pause-btn-wide {
+  grid-column: 1 / -1;
+}
+
+.pause-grid-v11 .pause-btn-audio {
+  grid-column: span 2;
+  min-width: 0;
+  min-height: 82px;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 4px;
+  font-size: 17px;
+  line-height: 1.1;
+}
+
+.pause-grid-v11 .pause-btn-half {
+  grid-column: span 3;
+  min-width: 0;
+}
+
+/* v1.1 voice-over subtitle: English, big (>= 20 px), auto-hides, never intercepts taps.
+   Placed by src/fx/voice.js clear of buttons, trays and the objective strip. */
+.voice-subtitle {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 50;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: min(760px, calc(100vw - 256px));
+  padding: 9px 18px 10px;
+  border: 3px solid #ffd43b;
+  background: rgba(22, 22, 32, 0.84);
+  box-shadow: 0 5px 0 rgba(0, 0, 0, 0.45);
+  color: #ffffff;
+  font-size: clamp(20px, 2.3vw, 28px);
+  font-weight: 900;
+  line-height: 1.22;
+  text-align: center;
+  text-shadow: 0 2px 0 #000000;
+  pointer-events: none;
+  animation: voice-sub-pop 0.16s ease-out;
+}
+
+@keyframes voice-sub-pop {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (max-width: 720px), (max-height: 520px) {
+  .voice-subtitle {
+    max-width: calc(100vw - 28px);
+    padding: 7px 12px 8px;
+    font-size: 20px;
+  }
+}
+
 .iris-fx {
   position: fixed;
   left: 0;
@@ -1309,7 +1372,7 @@ body > canvas {
 }
 
 /* ==========================================================================
-   Final 排行榜 Screen (§8.5, §8.6)
+   Final Leaderboard Screen (§8.5, §8.6)
    ========================================================================== */
 .final-overlay {
   position: fixed;
@@ -2158,5 +2221,257 @@ body > canvas {
   }
   50% {
     transform: translate3d(var(--beacon-dx, 4px), var(--beacon-dy, 0px), 0) scale(1.06);
+  }
+}
+
+/* v1.1 English l10n */
+html, body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.title-main-banner {
+  max-width: calc(100vw - 24px);
+}
+
+.title-main-text {
+  font-size: clamp(22px, 4.2vw, 42px);
+  letter-spacing: 1px;
+}
+
+.tier-label-tile {
+  width: 132px;
+  flex: 0 0 132px;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 6px;
+  font-size: 15.5px;
+  line-height: 1.08;
+  white-space: normal;
+  text-align: center;
+}
+
+.tier-icon {
+  font-size: 22px;
+}
+
+.tier-name {
+  display: block;
+  line-height: 1.06;
+}
+
+.board-card-label {
+  font-size: 12px;
+  letter-spacing: -0.2px;
+}
+
+.tier-row-cards.is-crowded .board-card-label {
+  font-size: 10.5px;
+}
+
+.board-reaction-banner {
+  max-width: calc(100vw - 24px);
+  font-size: clamp(17px, 2.6vw, 26px);
+  padding: 8px 18px;
+}
+
+.board-hint-caption {
+  font-size: 17px;
+  padding: 5px 12px;
+}
+
+.next-matting {
+  width: auto;
+  min-width: 224px;
+  max-width: min(328px, calc(100vw - 56px));
+}
+
+.next-mob-hint {
+  font-size: 17px;
+}
+
+.pause-card {
+  width: min(384px, calc(100vw - 20px));
+}
+
+.pause-btn-cell {
+  font-size: 16.5px;
+  padding: 6px 8px;
+  gap: 6px;
+}
+
+.final-tier-label {
+  width: 116px;
+  flex: 0 0 116px;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+  font-size: 14px;
+  line-height: 1.06;
+  white-space: normal;
+  text-align: center;
+}
+
+.final-title {
+  font-size: 20px;
+}
+
+@media (max-width: 720px) {
+  .title-sub-banner {
+    font-size: 16px;
+    letter-spacing: 2px;
+    padding: 4px 12px;
+  }
+
+  .title-main-banner {
+    max-width: calc(100vw - 16px);
+    padding: 6px 10px 8px;
+    gap: 5px;
+  }
+
+  .title-main-text {
+    font-size: clamp(18px, 4.9vw, 25px);
+    letter-spacing: 0.5px;
+  }
+
+  .title-deco {
+    font-size: 19px;
+  }
+
+  .hud-objective-strip {
+    font-size: 15.5px;
+    padding: 6px 8px;
+    gap: 5px;
+  }
+
+  .tier-label-tile {
+    width: 88px;
+    flex: 0 0 88px;
+    flex-direction: column;
+    gap: 2px;
+    padding: 2px 4px;
+    font-size: 12.5px;
+    line-height: 1.05;
+    white-space: normal;
+    text-align: center;
+  }
+
+  .tier-icon {
+    font-size: 18px;
+  }
+
+  .board-card-label,
+  .tier-row-cards.is-crowded .board-card-label {
+    font-size: 10.5px;
+  }
+
+  .board-hint-caption {
+    font-size: 14.5px;
+    padding: 4px 8px;
+  }
+
+  .board-reaction-banner {
+    font-size: 16px;
+    padding: 7px 12px;
+  }
+
+  .pause-btn-cell {
+    min-width: 136px;
+    font-size: 15.5px;
+    padding: 6px;
+    gap: 5px;
+  }
+
+  .final-tier-label {
+    width: 82px;
+    flex: 0 0 82px;
+    flex-direction: column;
+    gap: 1px;
+    padding: 2px 3px;
+    font-size: 11.5px;
+    line-height: 1.04;
+    white-space: normal;
+    text-align: center;
+  }
+
+  .final-header-card {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 4px 10px;
+  }
+
+  .final-title {
+    font-size: 15px;
+  }
+
+  .final-stars {
+    font-size: 24px;
+  }
+
+  .final-time {
+    font-size: 15px;
+  }
+
+  .final-action-btn {
+    min-width: 102px;
+    padding: 4px 5px;
+    font-size: 15px;
+    gap: 4px;
+  }
+}
+
+@media (max-height: 520px) {
+  .title-main-text {
+    font-size: clamp(22px, 3.8vw, 30px);
+  }
+
+  .tier-label-tile {
+    width: 108px;
+    flex: 0 0 108px;
+    flex-direction: column;
+    gap: 1px;
+    padding: 2px 4px;
+    font-size: 12.5px;
+    line-height: 1.04;
+    white-space: normal;
+    text-align: center;
+  }
+
+  .tier-icon {
+    font-size: 17px;
+    line-height: 1;
+  }
+
+  .board-card-label,
+  .tier-row-cards.is-crowded .board-card-label {
+    font-size: 10px;
+  }
+
+  .board-hint-caption {
+    font-size: 14.5px;
+  }
+
+  .pause-btn-cell {
+    font-size: 15.5px;
+  }
+
+  .final-tier-label {
+    width: 100px;
+    flex: 0 0 100px;
+    flex-direction: column;
+    gap: 1px;
+    padding: 2px 4px;
+    font-size: 12px;
+    line-height: 1.04;
+    white-space: normal;
+    text-align: center;
+  }
+
+  .final-title {
+    font-size: 15.5px;
+  }
+
+  .final-action-btn {
+    font-size: 16.5px;
+    padding: 4px 8px;
   }
 }

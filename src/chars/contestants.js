@@ -1,5 +1,6 @@
 import { fillNoiseRect, shadeHex } from './skins.js';
 import { paintChibiFace } from './faces.js';
+import { CONTESTANT_NAMES } from '../data/strings.js';
 
 function px(g, x, y, w, h, col) {
   g.fillStyle = col;
@@ -15,7 +16,7 @@ function px(g, x, y, w, h, col) {
 export const CONTESTANT_SPECS = {
   // 1. 花花 (羊): wool-cube hood + flowers + pink overall apron + wool puff tail
   sheep: {
-    name: '花花',
+    name: CONTESTANT_NAMES.sheep,
     hatTopY: 1.10,
     hairColor: '#6d4c3d',
     bodyColor: '#ff9ebb',
@@ -58,7 +59,7 @@ export const CONTESTANT_SPECS = {
 
   // 2. 啵啵 (史莱姆): translucent green jelly head + twin buns with opaque cute face inside!
   slime: {
-    name: '啵啵',
+    name: CONTESTANT_NAMES.slime,
     headS: 0.78, // inner solid slime core so outer 1.06 jelly shell wraps cleanly around it!
     hairColor: '#2f9e44',
     bodyColor: '#51cf66',
@@ -83,7 +84,7 @@ export const CONTESTANT_SPECS = {
 
   // 3. 喵喵 (猫): pointy cat ears + striped upturned cat tail + collar bell
   cat: {
-    name: '喵喵',
+    name: CONTESTANT_NAMES.cat,
     hairColor: '#e76f51',
     bodyColor: '#f4a261',
     sleeveColor: '#f4a261',
@@ -128,7 +129,7 @@ export const CONTESTANT_SPECS = {
 
   // 4. 铁铁 (铁傀儡): big iron shoulder pauldrons + green vines + blooms
   golem: {
-    name: '铁铁',
+    name: CONTESTANT_NAMES.golem,
     bodyW: 0.82,
     limbW: 0.33,
     hairColor: '#adb5bd',
@@ -170,7 +171,7 @@ export const CONTESTANT_SPECS = {
 
   // 5. 雪宝 (雪傀儡): puffy snowball coat body + coal buttons + bright pumpkin-orange pigtails
   snow: {
-    name: '雪宝',
+    name: CONTESTANT_NAMES.snow,
     hairColor: '#f76707',
     bodyColor: '#ffffff',
     sleeveColor: '#f8f9fa',
@@ -203,7 +204,7 @@ export const CONTESTANT_SPECS = {
 
   // 6. 嘶嘶 (苦力怕): mottled green creeper-pattern hoodie + hood ears/brim
   creeper: {
-    name: '嘶嘶',
+    name: CONTESTANT_NAMES.creeper,
     hatTopY: 1.05,
     hairColor: '#2b8a3e',
     bodyColor: '#52b74a',
@@ -251,7 +252,7 @@ export const CONTESTANT_SPECS = {
 
   // 7. 嗡嗡 (蜜蜂): yellow/brown stripes + 2 cute antennae + 2 gauzy white wings
   bee: {
-    name: '嗡嗡',
+    name: CONTESTANT_NAMES.bee,
     hairColor: '#f59f00',
     bodyColor: '#ffd43b',
     sleeveColor: '#ffd43b',
@@ -287,7 +288,7 @@ export const CONTESTANT_SPECS = {
 
   // 8. 小末 (末影人): tall/thin, long dark flowing hair, glowing pink-purple eyes + floating purple particles!
   ender: {
-    name: '小末',
+    name: CONTESTANT_NAMES.ender,
     legH: 0.74,
     bodyW: 0.62,
     limbW: 0.26,
@@ -328,7 +329,7 @@ export const CONTESTANT_SPECS = {
 
   // 9. 三三 (凋零): black Nether outfit + soul-blue rib trim + 2 small cute skull heads on shoulders!
   wither: {
-    name: '三三',
+    name: CONTESTANT_NAMES.wither,
     hairColor: '#26232c',
     bodyColor: '#211e28',
     sleeveColor: '#26232c',
@@ -373,7 +374,7 @@ export const CONTESTANT_SPECS = {
 
   // 10. 翠翠 (村民): straw hat + green merchant robe + emerald clasp + cute big villager nose!
   villager: {
-    name: '翠翠',
+    name: CONTESTANT_NAMES.villager,
     hairColor: '#6c4329',
     bodyColor: '#2f9e44',
     sleeveColor: '#37b24d',
@@ -408,7 +409,7 @@ export const CONTESTANT_SPECS = {
 
   // 11. 龙宝宝 (末影龙, hidden): black-purple dragon wings + horns + spiky dragon tail!
   dragon: {
-    name: '龙宝宝',
+    name: CONTESTANT_NAMES.dragon,
     hairColor: '#2d1b46',
     bodyColor: '#1f162b',
     sleeveColor: '#261b36',
@@ -445,7 +446,7 @@ export const CONTESTANT_SPECS = {
 
   // 12. 粉粉 (粉色羊, hidden): extra-fluffy cotton-candy pink wool hood + ribbon dress + puff tail!
   pinksheep: {
-    name: '粉粉',
+    name: CONTESTANT_NAMES.pinksheep,
     hatTopY: 1.12,
     hairColor: '#ff6b9d',
     bodyColor: '#fff0f6',

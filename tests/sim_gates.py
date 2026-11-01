@@ -42,6 +42,10 @@ from qa_helpers import (  # noqa: E402
     verify_board_tier_mode,
 )
 
+# v1.1: walking is 1.5x faster (user request) so a random-ish full run is ~15 % shorter; the F7 median lower bound
+# drops from 15 to 12 minutes (docs/DESIGN.md §11/§12). Upper bound and the ideal <= 14 min cap are unchanged.
+F7_RAND_MEDIAN_MIN = 12.0
+
 INSTALL_SIM_HARNESS_JS = r"""
 (() => {
   const mulberry32 = (seed) => {
@@ -116,8 +120,8 @@ INSTALL_SIM_HARNESS_JS = r"""
       direct = direct.trim();
       if (!direct) continue;
       const nCjk = (direct.match(cjkRe) || []).length;
-      if (nCjk > 12) {
-        out.push({ text: direct.slice(0, 30), cjkCount: nCjk });
+      if (nCjk > 0 || direct.length > 24) {
+        out.push({ text: direct.slice(0, 40), cjkCount: nCjk, len: direct.length });
       }
     }
     return out;
@@ -1490,7 +1494,7 @@ def run_sim_gates_on_session(
         ideal_session['completedAll']
         and ideal_min <= 14.0
         and len(rand_mins) >= math.ceil(0.8 * len(rand_sessions))
-        and 15.0 <= med_rand_min <= 25.0
+        and F7_RAND_MEDIAN_MIN <= med_rand_min <= 25.0
     )
     f7_meas = (
         f"ideal={ideal_min}m (done={ideal_session['completedAll']}), "
@@ -1499,7 +1503,7 @@ def run_sim_gates_on_session(
     gates.append({
         'id': 'F7',
         'gate': 'F7 session length',
-        'target': 'ideal full run <=14 min; random-ish median 15-25 min',
+        'target': f'ideal full run <=14 min; random-ish median {F7_RAND_MEDIAN_MIN:.0f}-25 min (v1.1)',
         'measured': f7_meas,
         'passed': f7_pass,
         'details': {'ideal': ideal_session, 'random': rand_sessions},
@@ -1543,12 +1547,12 @@ def run_sim_gates_on_session(
     )
     f10_meas = (
         f'pointer non-null={ptr_rate * 100:.1f}% ({pointer_total_samples - pointer_total_nulls}/{pointer_total_samples}), '
-        f'>12 CJK strings={len(cjk_all_violations)}'
+        f'CJK/>24ch HUD strings={len(cjk_all_violations)}'
     )
     gates.append({
         'id': 'F10',
         'gate': "F10 show-don't-tell",
-        'target': 'quest.pointer non-null 100% active frames; 0 HUD strings >12 CJK',
+        'target': 'quest.pointer non-null 100% active frames; 0 CJK chars & no HUD string >24 chars',
         'measured': f10_meas,
         'passed': f10_pass,
         'details': {

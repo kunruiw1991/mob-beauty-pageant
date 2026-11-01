@@ -6,6 +6,7 @@
 // - Deterministic 12 s idle auto-pick + auto-snap via update(dt)
 
 import { ACCESSORIES_BY_ID, getContestantMeta } from '../data/roster.js';
+import { UI } from '../data/strings.js';
 import { bindTap, drawAccessoryThumb, drawContestantChibi2D, getVoxelTextures, MOB_ICONS } from './ui_kit.js';
 import { renderPortrait } from './portrait.js';
 import { progress } from './progress.js';
@@ -84,7 +85,7 @@ export function createBoothUI(ctx = {}, hooks = {}) {
   snapBtn.type = 'button';
   snapBtn.id = 'booth-snap-btn';
   snapBtn.className = 'mc-btn mc-btn-gold booth-snap-btn';
-  snapBtn.setAttribute('aria-label', '拍照');
+  snapBtn.setAttribute('aria-label', UI.takePhotoAria);
   snapBtn.innerHTML = `<span class="booth-cam-icon">📸</span>`;
   tray.appendChild(snapBtn);
 

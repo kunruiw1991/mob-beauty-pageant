@@ -370,10 +370,12 @@ export function createEmoteSprite(icon) {
         g.fillRect(cx - 1, 17, 2, 7);
       } else {
         g.fillStyle = '#18181b';
-        g.font = isWide ? '900 24px "Noto Sans SC", system-ui, sans-serif' : '900 34px system-ui, sans-serif';
+        const clipped = String(text).slice(0, 18);
+        const fontPx = isWide ? (clipped.length > 10 ? 19 : 23) : 34;
+        g.font = `900 ${fontPx}px system-ui, sans-serif`;
         g.textAlign = 'center';
         g.textBaseline = 'middle';
-        g.fillText(text.slice(0, 10), w / 2, 34);
+        g.fillText(clipped, w / 2, 34, w - 24);
       }
     }
     const tex = canvasToTexture(c);

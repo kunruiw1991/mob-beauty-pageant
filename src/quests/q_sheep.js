@@ -4,6 +4,7 @@
 // only every 3rd flower sparkles and stops sparkling after 8 s -> chase fresh ones.
 
 import * as THREE from '../../vendor/three.module.min.js';
+import { CONTESTANT_NAMES, QUEST_LABELS } from '../data/strings.js';
 import {
   poi,
   surfaceY,
@@ -98,8 +99,8 @@ function plantTrailFlower(ctx, atPos, forceSparkle = null) {
     bobAmp: isSparkly ? 0.14 : 0.03,
     autoPickupRadius: isSparkly ? 1.2 : 0,
     range: 2.35,
-    label: isSparkly ? '闪亮花朵' : '小花',
-    fadedLabel: '小花',
+    label: isSparkly ? QUEST_LABELS.sheep.sparkleFlower : QUEST_LABELS.sheep.flower,
+    fadedLabel: QUEST_LABELS.sheep.flower,
     pitch: 0.95 + (pickedCount + 1) * 0.14,
     onCollect: (api) => {
       if (finishing || pickedCount >= NEED_FLOWERS) return;
@@ -194,7 +195,7 @@ const qSheep = {
         targetId: 'sheep_give',
         entityId: 'sheep',
         kind: 'entity',
-        label: '花花',
+        label: CONTESTANT_NAMES.sheep,
         hitRadius: 1.15,
       });
 
@@ -324,7 +325,7 @@ const qSheep = {
           id: 'sheep_finishing_wait',
           pos: { x: sheepPos.x, y: sheepPos.y + 0.8, z: sheepPos.z },
           kind: 'wait',
-          label: '花花',
+          label: CONTESTANT_NAMES.sheep,
           range: 2.5,
         },
       ];
@@ -346,7 +347,7 @@ const qSheep = {
           id: 'sheep_follow_wait',
           pos: { x: sheepPos.x, y: sheepPos.y + 0.6, z: sheepPos.z },
           kind: 'wait',
-          label: '跟着花花',
+          label: QUEST_LABELS.sheep.follow,
           range: 2.5,
         },
       ];
@@ -357,7 +358,7 @@ const qSheep = {
         id: 'sheep_give',
         pos: { x: sheepPos.x, y: sheepPos.y + 0.8, z: sheepPos.z },
         kind: 'entity',
-        label: '送花给花花',
+        label: QUEST_LABELS.sheep.giveBouquet,
         range: 2.4,
       },
     ];

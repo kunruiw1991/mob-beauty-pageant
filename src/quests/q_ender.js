@@ -3,6 +3,7 @@
 // 🎂 decoy cake x3 (5s eat), 2 cell padlocks + 3-tap cell door -> 小凯 locked in cell w/ cake face, docs/DESIGN.md §6.8, F9).
 
 import * as THREE from '../../vendor/three.module.min.js';
+import { CONTESTANT_NAMES, QUEST_LABELS } from '../data/strings.js';
 import { B } from '../world/blocks.js';
 import {
   poi,
@@ -25,10 +26,10 @@ import {
 const END_ARRIVE = { x: 152.5, y: 8, z: 54.5 };
 const END_EXIT = { x: 152.5, y: 8, z: 57.5 };
 const END_SEAL_SPOTS = [
-  { x: 139.5, y: 8, z: 48.5, label: '西南水晶印' },
-  { x: 140.5, y: 8, z: 30.5, label: '西北水晶印' },
-  { x: 163.5, y: 8, z: 30.5, label: '东北水晶印' },
-  { x: 164.5, y: 8, z: 47.5, label: '东南水晶印' },
+  { x: 139.5, y: 8, z: 48.5, label: QUEST_LABELS.ender.sealSW },
+  { x: 140.5, y: 8, z: 30.5, label: QUEST_LABELS.ender.sealNW },
+  { x: 163.5, y: 8, z: 30.5, label: QUEST_LABELS.ender.sealNE },
+  { x: 164.5, y: 8, z: 47.5, label: QUEST_LABELS.ender.sealSE },
 ];
 const END_CAGE_BARS = { x: 160.5, y: 8, z: 40.5 };
 const END_CAGE_FRONT = { x: 159.2, y: 8, z: 40.5 };
@@ -43,7 +44,7 @@ const PRISON_GATE_INSIDE = { x: 19.6, y: 8, z: 66.5 };
 const PRISON_CELL_DOOR = { x: 15.5, y: 8, z: 66.5 };
 const PRISON_CELL_FRONT = { x: 16.4, y: 8, z: 66.5 };
 const PRISON_CELL_INSIDE = { x: 14.3, y: 8, z: 66.5 };
-const CELL_KEY_SPOT = { x: 13.2, y: 8, z: 64.2, label: '拿牢房金钥' };
+const CELL_KEY_SPOT = { x: 13.2, y: 8, z: 64.2, label: QUEST_LABELS.ender.cellKey };
 
 const STONE_COORDS = [
   { bx: 23, bz: 66, x: 23.5, z: 66.5 },
@@ -271,7 +272,7 @@ function setupEndCagePhase(ctx) {
     blockId: B.IRON_BARS,
     sfxHit: 'hit_stone',
     sfxBreak: 'break',
-    label: '铁栏杆',
+    label: QUEST_LABELS.ender.ironBars,
     range: 2.3,
     onBreak: () => beginScriptedSteal(ctx),
   });
@@ -317,7 +318,7 @@ function openPortalChasePhase(ctx) {
     id: 'ender_exit_portal',
     targetId: 'ender_exit_portal',
     kind: 'block',
-    label: '追进传送门',
+    label: QUEST_LABELS.ender.chasePortal,
     hitRadius: 1.4,
   });
   playSfx(ctx, 'portal', { pos: END_EXIT });
@@ -339,7 +340,7 @@ function enterHubChasePhase(ctx) {
     id: 'ender_kai_house_trail',
     targetId: 'ender_kai_house_trail',
     kind: 'entity',
-    label: '追上小凯',
+    label: QUEST_LABELS.ender.chaseKai,
     hitRadius: 1.35,
   });
   ctx?.rival?.appear?.({ x: 22.2, y: 8, z: 45.5 }, 'cameo', 'ender');
@@ -372,7 +373,7 @@ function setupPrisonLayout(ctx) {
       id: `ender_stone_${s.index}`,
       targetId: `ender_stone_${s.index}`,
       kind: 'block',
-      label: '黑曜石踏板',
+      label: QUEST_LABELS.ender.obsidianPad,
       hitRadius: 1.05,
     });
   }
@@ -397,7 +398,7 @@ function setupPrisonLayout(ctx) {
     blockId: B.COBWEB,
     sfxHit: 'snip',
     sfxBreak: 'snip',
-    label: '剪蛛网',
+    label: QUEST_LABELS.ender.snipWeb,
     range: 2.2,
     onBreak: () => checkCobwebsCleared(ctx),
   });
@@ -414,7 +415,7 @@ function setupPrisonLayout(ctx) {
     blockId: B.COBWEB,
     sfxHit: 'snip',
     sfxBreak: 'snip',
-    label: '剪蛛网',
+    label: QUEST_LABELS.ender.snipWeb,
     range: 2.2,
     onBreak: () => checkCobwebsCleared(ctx),
   });
@@ -470,7 +471,7 @@ function checkCobwebsCleared(ctx) {
       blockId: B.OBSIDIAN,
       sfxHit: 'hit_stone',
       sfxBreak: 'break',
-      label: '牢房门',
+      label: QUEST_LABELS.ender.cellDoor,
       range: 2.2,
       onBreak: () => finishPrisonRescue(ctx),
     });
@@ -804,7 +805,7 @@ const qEnder = {
         ctx.state.area !== 'end')
     ) {
       const ep = poi(ctx, 'endPortal', { x: 20.5, y: 8, z: 18.5 });
-      return [{ id: 'ender_portal', pos: { x: ep.x, y: 8, z: ep.z }, kind: 'block', label: '进末地门', range: 2.2 }];
+      return [{ id: 'ender_portal', pos: { x: ep.x, y: 8, z: ep.z }, kind: 'block', label: QUEST_LABELS.ender.enterEndPortal, range: 2.2 }];
     }
 
     if (phase === 'end_seals') {
@@ -816,23 +817,23 @@ const qEnder = {
     }
 
     if (phase === 'end_cage') {
-      return [{ id: 'ender_cage_bars', pos: { ...END_CAGE_FRONT }, kind: 'block', label: '铁栏杆', range: 2.2 }];
+      return [{ id: 'ender_cage_bars', pos: { ...END_CAGE_FRONT }, kind: 'block', label: QUEST_LABELS.ender.ironBars, range: 2.2 }];
     }
 
     if (phase === 'steal_cutscene') {
-      return [{ id: 'ender_steal_wait', pos: { x: 156.5, y: 8, z: 44.5 }, kind: 'wait', label: '小凯抢人!', range: 2.4 }];
+      return [{ id: 'ender_steal_wait', pos: { x: 156.5, y: 8, z: 44.5 }, kind: 'wait', label: QUEST_LABELS.ender.kaiSteals, range: 2.4 }];
     }
 
     if (phase === 'chase_portal') {
-      return [{ id: 'ender_exit_portal', pos: { ...END_EXIT }, kind: 'block', label: '追进传送门', range: 2.3 }];
+      return [{ id: 'ender_exit_portal', pos: { ...END_EXIT }, kind: 'block', label: QUEST_LABELS.ender.chasePortal, range: 2.3 }];
     }
 
     if (phase === 'chase_house') {
-      return [{ id: 'ender_kai_house_trail', pos: { ...HUB_KAI_HOUSE_TRAIL }, kind: 'entity', label: '追上小凯', range: 2.3 }];
+      return [{ id: 'ender_kai_house_trail', pos: { ...HUB_KAI_HOUSE_TRAIL }, kind: 'entity', label: QUEST_LABELS.ender.chaseKai, range: 2.3 }];
     }
 
     if (phase === 'chase_prison') {
-      return [{ id: 'ender_moat_bank', pos: { ...PRISON_OUTER_BANK }, kind: 'block', label: '到熔岩边', range: 2.2 }];
+      return [{ id: 'ender_moat_bank', pos: { ...PRISON_OUTER_BANK }, kind: 'block', label: QUEST_LABELS.ender.lavaEdge, range: 2.2 }];
     }
 
     if (phase === 'stones') {
@@ -843,7 +844,7 @@ const qEnder = {
           id: `ender_stone_${s.index}`,
           pos: { x: s.x + 0.65, y: 8, z: s.z },
           kind: 'block',
-          label: '跳黑曜石',
+          label: QUEST_LABELS.ender.hopObsidian,
           range: 2.1,
         },
       ];
@@ -851,10 +852,10 @@ const qEnder = {
 
     if (phase === 'cobwebs') {
       if (cobweb0 && !cobweb0.broken) {
-        return [{ id: 'ender_web_0', pos: { x: 21.15, y: 8, z: 66.5 }, kind: 'block', label: '剪蛛网', range: 2.2 }];
+        return [{ id: 'ender_web_0', pos: { x: 21.15, y: 8, z: 66.5 }, kind: 'block', label: QUEST_LABELS.ender.snipWeb, range: 2.2 }];
       }
       if (cobweb1 && !cobweb1.broken) {
-        return [{ id: 'ender_web_1', pos: { x: 21.15, y: 8, z: 65.5 }, kind: 'block', label: '剪蛛网', range: 2.2 }];
+        return [{ id: 'ender_web_1', pos: { x: 21.15, y: 8, z: 65.5 }, kind: 'block', label: QUEST_LABELS.ender.snipWeb, range: 2.2 }];
       }
     }
 
@@ -864,11 +865,11 @@ const qEnder = {
         return [{ id: curLock.id, pos: { x: CELL_KEY_SPOT.x, y: 8, z: CELL_KEY_SPOT.z }, kind: 'block', label: CELL_KEY_SPOT.label, range: 2.2 }];
       }
       if (cellDoorBreakable && !cellDoorBreakable.broken) {
-        return [{ id: 'ender_cell_door', pos: { ...PRISON_CELL_FRONT }, kind: 'block', label: '牢房门', range: 2.1 }];
+        return [{ id: 'ender_cell_door', pos: { ...PRISON_CELL_FRONT }, kind: 'block', label: QUEST_LABELS.ender.cellDoor, range: 2.1 }];
       }
     }
 
-    return [{ id: 'ender_rescue_wait', pos: { ...PRISON_SAFE_OUTSIDE }, kind: 'wait', label: '小末', range: 2.4 }];
+    return [{ id: 'ender_rescue_wait', pos: { ...PRISON_SAFE_OUTSIDE }, kind: 'wait', label: CONTESTANT_NAMES.ender, range: 2.4 }];
   },
 
   pointer(ctx) {

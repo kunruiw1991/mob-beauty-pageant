@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Comprehensive 36-test E2E verification suite for Mob Beauty Pageant (owner: qa-sims).
+"""Comprehensive 42-test E2E verification suite for Mob Beauty Pageant (owner: qa-sims; v1.1 checks T37–T42).
 
 Covers all §1–§11 binding requirements:
 - Boot with #title visible by default, 0 console/runtime errors & 0 HTTP 4xx/5xx
@@ -16,6 +16,9 @@ Covers all §1–§11 binding requirements:
 - Finale (小凯 runway strut + ranking) & Final 排行榜 screen (★ stars, 分享 PNG, 再来一次, 继续找)
 - Pause menu, debug URL params (?seed=&quest=&scene=&area=), 3600-frame determinism (3/3 seeds)
 - F12 layout audit at all 4 viewports + quick F1–F14 sim gates check
+- v1.1 (tests/v11_checks.py): 6.5 b/s walking + gait/camera (T37), voice clips present/decodable/<= 6 MB (T38),
+  voice playback + subtitle + BGM duck after a real gesture (T39), persisted Voice toggle + caps (T40), subtitle
+  never covering controls at 4 viewports (T41), zero Chinese in DOM + canvas text (T42)
 
 Usage:
   python3 tests/run_e2e.py
@@ -58,6 +61,7 @@ from qa_helpers import (  # noqa: E402
     verify_board_tier_mode,
 )
 from sim_gates import INSTALL_SIM_HARNESS_JS, run_sim_gates_on_session  # noqa: E402
+from v11_checks import V11_TESTS  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -157,6 +161,16 @@ def t02_repo_hygiene_zero_build_no_speech_no_cdn_no_boot_compile(sess: QASession
   assert not bad_specifiers, f'Non-relative or extensionless imports found: {bad_specifiers}'
   assert not external_urls, f'External runtime URLs found: {external_urls}'
   assert not forbidden_assets, f'Binary media assets found under src/styles: {forbidden_assets}'
+  # v1.1: the only binary media allowed are the voice-over clips (assets/voice/*.mp3) and the README screenshot.
+  stray_media: list[str] = []
+  for root, dirs, files in os.walk(REPO_ROOT):
+    dirs[:] = [d for d in dirs if d not in ('.git', '.agents', 'node_modules', '__pycache__')]
+    for fn in files:
+      rel = os.path.relpath(os.path.join(root, fn), REPO_ROOT).replace(os.sep, '/')
+      if fn.lower().endswith(asset_exts) and rel != 'screenshot.jpg' and not (
+          rel.startswith('assets/voice/') and fn.lower().endswith('.mp3')):
+        stray_media.append(rel)
+  assert not stray_media, f'Unexpected media files (only assets/voice/*.mp3 + screenshot.jpg allowed): {stray_media}'
   assert not boot_compile, f'Forbidden renderer.compile() found (§1): {boot_compile}'
 
 
@@ -1081,11 +1095,12 @@ ALL_TESTS: list[tuple[str, Callable[[QASession], None]]] = [
     ('T34_layout_audit_844x390', t34_layout_audit_844x390),
     ('T35_layout_audit_390x844', t35_layout_audit_390x844),
     ('T36_sim_gates_quick_subset', t36_sim_gates_quick_subset),
+    *V11_TESTS,
 ]
 
 
 def main() -> int:
-  ap = argparse.ArgumentParser(description='Run 36-test E2E suite for Mob Beauty Pageant')
+  ap = argparse.ArgumentParser(description='Run 42-test E2E suite for Mob Beauty Pageant')
   ap.add_argument('--filter', type=str, default='', help='Substring filter on test names')
   ap.add_argument('--strict', action='store_true', help='Treat XFAIL as FAIL (use when integrated build lands)')
   args = ap.parse_args()

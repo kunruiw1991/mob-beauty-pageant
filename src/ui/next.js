@@ -2,6 +2,7 @@
 // Shows oak item-frame holding the next contestant's pixel face + green `NEXT` badge + creeper-hoodie sleeves for 1.5 s.
 
 import { getContestantMeta } from '../data/roster.js';
+import { UI } from '../data/strings.js';
 import { drawContestantChibi2D, getVoxelTextures, MOB_ICONS } from './ui_kit.js';
 
 export function createNextUI(ctx = {}, hooks = {}) {
@@ -40,7 +41,7 @@ export function createNextUI(ctx = {}, hooks = {}) {
 
   const nextPill = document.createElement('span');
   nextPill.className = 'next-green-pill';
-  nextPill.textContent = 'NEXT';
+  nextPill.textContent = UI.nextPill;
 
   const nameHint = document.createElement('span');
   nameHint.className = 'next-mob-hint';

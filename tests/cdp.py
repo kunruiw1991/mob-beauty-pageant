@@ -27,7 +27,7 @@ import time
 import urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TMP = '/tmp/bv1xyn'
+TMP = os.environ.get('PAGEANT_TMP', '/tmp/bv1xyn')
 CHROME = os.environ.get('CHROME_BIN', '/usr/bin/google-chrome')
 
 

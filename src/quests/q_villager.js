@@ -5,6 +5,7 @@
 // -> slot all 10 gems at Market Stall -> 翠翠 pops in w/ emerald eyes & 小凯 faints at his empty chest, docs/DESIGN.md §6.10).
 
 import * as THREE from '../../vendor/three.module.min.js';
+import { CONTESTANT_NAMES, QUEST_LABELS } from '../data/strings.js';
 import { B } from '../world/blocks.js';
 import {
   surfaceY,
@@ -32,9 +33,9 @@ const STALL_COUNTER = { x: 74.0, y: 8, z: 22.5 };
 const STALL_ARRIVE = { x: 74.2, y: 8, z: 24.3 };
 
 const WHEAT_SPOTS = [
-  { x: 54.5, y: 8, z: 29.5, label: '收金麦束' },
-  { x: 57.5, y: 8, z: 36.5, label: '收金麦束' },
-  { x: 75.0, y: 8, z: 16.5, label: '收金麦束' },
+  { x: 54.5, y: 8, z: 29.5, label: QUEST_LABELS.villager.harvestWheat },
+  { x: 57.5, y: 8, z: 36.5, label: QUEST_LABELS.villager.harvestWheat },
+  { x: 75.0, y: 8, z: 16.5, label: QUEST_LABELS.villager.harvestWheat },
 ];
 
 const VILLAGER_SPOTS = [
@@ -59,12 +60,12 @@ const VAULT_EMERALD_COORDS = [
 ];
 
 const BUTTON_COLORS = [
-  { idx: 0, hex: 0xc43bd8, blockId: B.CONCRETE_PERFECT, sfx: 'note0', label: '紫按钮' },
-  { idx: 1, hex: 0x3b5bdb, blockId: B.CONCRETE_GORGEOUS, sfx: 'note1', label: '蓝按钮' },
-  { idx: 2, hex: 0xf2c318, blockId: B.CONCRETE_PRETTY, sfx: 'note2', label: '黄按钮' },
-  { idx: 3, hex: 0xd9342b, blockId: B.CONCRETE_OKAY, sfx: 'note3', label: '红按钮' },
-  { idx: 4, hex: 0x3fae3a, blockId: B.CONCRETE_TRYHARD, sfx: 'note4', label: '绿按钮' },
-  { idx: 5, hex: 0xf77f00, blockId: B.TERRACOTTA_ORANGE, sfx: 'note5', label: '橙按钮' },
+  { idx: 0, hex: 0xc43bd8, blockId: B.CONCRETE_PERFECT, sfx: 'note0', label: QUEST_LABELS.villager.btnPurple },
+  { idx: 1, hex: 0x3b5bdb, blockId: B.CONCRETE_GORGEOUS, sfx: 'note1', label: QUEST_LABELS.villager.btnBlue },
+  { idx: 2, hex: 0xf2c318, blockId: B.CONCRETE_PRETTY, sfx: 'note2', label: QUEST_LABELS.villager.btnYellow },
+  { idx: 3, hex: 0xd9342b, blockId: B.CONCRETE_OKAY, sfx: 'note3', label: QUEST_LABELS.villager.btnRed },
+  { idx: 4, hex: 0x3fae3a, blockId: B.CONCRETE_TRYHARD, sfx: 'note4', label: QUEST_LABELS.villager.btnGreen },
+  { idx: 5, hex: 0xf77f00, blockId: B.TERRACOTTA_ORANGE, sfx: 'note5', label: QUEST_LABELS.villager.btnOrange },
 ];
 
 let villageRoot = null;
@@ -291,7 +292,7 @@ function dropMysteryDiamond(ctx, atPos) {
     ttl: 7.5,
     range: 2.2,
     item: 'diamond',
-    label: '捡钻石',
+    label: QUEST_LABELS.villager.pickupDiamond,
     sfx: 'pickup',
     onCollect: () => {
       if (diamondsCollected >= DIAMOND_CAP) return;
@@ -366,7 +367,7 @@ const qVillager = {
       id: 'villager_bank_sign',
       targetId: 'villager_bank_sign',
       kind: 'block',
-      label: '看密码牌',
+      label: QUEST_LABELS.villager.readCodeSign,
       hitRadius: 1.25,
     });
 
@@ -375,7 +376,7 @@ const qVillager = {
       id: 'villager_stall_deliver',
       targetId: 'villager_stall_deliver',
       kind: 'block',
-      label: '摆满宝石摊',
+      label: QUEST_LABELS.villager.stockStall,
       hitRadius: 1.4,
     });
 
@@ -440,7 +441,7 @@ const qVillager = {
           targetId: `villager_npc_${idx}`,
           entityId: `villager_npc_${idx}`,
           kind: 'entity',
-          label: '村民换宝石',
+          label: QUEST_LABELS.villager.tradeVillager,
           hitRadius: 1.15,
         });
       }
@@ -654,7 +655,7 @@ const qVillager = {
           id: 'villager_done_wait',
           pos: { ...STALL_ARRIVE },
           kind: 'wait',
-          label: '翠翠',
+          label: CONTESTANT_NAMES.villager,
           range: 2.3,
         },
       ];
@@ -666,7 +667,7 @@ const qVillager = {
           id: 'villager_stall_deliver',
           pos: { ...STALL_ARRIVE },
           kind: 'block',
-          label: '摆满宝石摊',
+          label: QUEST_LABELS.villager.stockStall,
           range: 2.3,
         },
       ];
@@ -682,7 +683,7 @@ const qVillager = {
             id: `villager_npc_${nextV.idx}`,
             pos: { x: vp.x, y: 8, z: vp.z },
             kind: 'entity',
-            label: '村民换宝石',
+            label: QUEST_LABELS.villager.tradeVillager,
             range: 2.3,
           },
         ];
@@ -696,7 +697,7 @@ const qVillager = {
           id: nextWheat.id,
           pos: { x: nextWheat.pos.x, y: 8, z: nextWheat.pos.z },
           kind: 'block',
-          label: '收金麦束',
+          label: QUEST_LABELS.villager.harvestWheat,
           range: 2.2,
         },
       ];
@@ -710,7 +711,7 @@ const qVillager = {
           id: `villager_npc_${remVillager.idx}`,
           pos: { x: vp.x, y: 8, z: vp.z },
           kind: 'entity',
-          label: '村民换宝石',
+          label: QUEST_LABELS.villager.tradeVillager,
           range: 2.3,
         },
       ];
@@ -725,12 +726,12 @@ const qVillager = {
             id: nextDiamond.id,
             pos: { x: nextDiamond.pos.x, y: 8, z: nextDiamond.pos.z },
             kind: 'entity',
-            label: '捡钻石',
+            label: QUEST_LABELS.villager.pickupDiamond,
             range: 2.2,
           },
         ];
       }
-      return [{ id: 'villager_diamond_wait', pos: { ...SQUARE_WAIT_POS }, kind: 'wait', label: '追问号先生', range: 2.4 }];
+      return [{ id: 'villager_diamond_wait', pos: { ...SQUARE_WAIT_POS }, kind: 'wait', label: QUEST_LABELS.villager.chaseMystery, range: 2.4 }];
     }
 
     // 3. Bank heist: inspect 3-color corner sign, then press the 3 colored buttons in order (+5 emeralds)
@@ -741,7 +742,7 @@ const qVillager = {
             id: 'villager_bank_sign',
             pos: { ...BANK_SIGN_STAND },
             kind: 'block',
-            label: '看角落密码',
+            label: QUEST_LABELS.villager.readCodeSign,
             range: 2.2,
           },
         ];
@@ -760,7 +761,7 @@ const qVillager = {
       }
     }
 
-    return [{ id: 'villager_diamond_wait', pos: { ...SQUARE_WAIT_POS }, kind: 'wait', label: '等问号先生', range: 2.4 }];
+    return [{ id: 'villager_diamond_wait', pos: { ...SQUARE_WAIT_POS }, kind: 'wait', label: QUEST_LABELS.villager.waitMystery, range: 2.4 }];
   },
 
   pointer(ctx) {

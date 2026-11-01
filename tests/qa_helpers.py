@@ -19,18 +19,18 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from cdp import Browser  # noqa: E402
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TMP_ROOT = '/tmp/bv1xyn'
-QA_TMP_DIR = '/tmp/bv1xyn/qa'
-QA_SHOTS_DIR = '/tmp/bv1xyn/shots/qa'
-GATES_JSON_PATH = '/tmp/bv1xyn/qa/gates.json'
-GATES_MD_PATH = '/tmp/bv1xyn/qa/gates.md'
+TMP_ROOT = os.environ.get('PAGEANT_TMP', '/tmp/bv1xyn')  # override with PAGEANT_TMP=/some/scratch/dir
+QA_TMP_DIR = os.path.join(TMP_ROOT, 'qa')
+QA_SHOTS_DIR = os.path.join(TMP_ROOT, 'shots', 'qa')
+GATES_JSON_PATH = os.path.join(QA_TMP_DIR, 'gates.json')
+GATES_MD_PATH = os.path.join(QA_TMP_DIR, 'gates.md')
 
 # Canonical 10 main quests in §4 / §6 order.
 MAIN_QUESTS: list[dict[str, Any]] = [
     {
         'id': 'sheep',
-        'name': '花花',
-        'mob': '羊',
+        'name': 'Blossom',
+        'mob': 'Sheep',
         'order': 1,
         'area': 'hub',
         'poi': 'meadow',
@@ -42,8 +42,8 @@ MAIN_QUESTS: list[dict[str, Any]] = [
     },
     {
         'id': 'slime',
-        'name': '啵啵',
-        'mob': '史莱姆',
+        'name': 'Bobo',
+        'mob': 'Slime',
         'order': 2,
         'area': 'hub',
         'poi': 'swamp',
@@ -55,8 +55,8 @@ MAIN_QUESTS: list[dict[str, Any]] = [
     },
     {
         'id': 'cat',
-        'name': '喵喵',
-        'mob': '猫',
+        'name': 'Mimi',
+        'mob': 'Cat',
         'order': 3,
         'area': 'hub',
         'poi': 'jungle',
@@ -68,8 +68,8 @@ MAIN_QUESTS: list[dict[str, Any]] = [
     },
     {
         'id': 'golem',
-        'name': '铁铁',
-        'mob': '铁傀儡',
+        'name': 'Tinny',
+        'mob': 'Iron Golem',
         'order': 4,
         'area': 'hub',
         'poi': 'cave',
@@ -81,8 +81,8 @@ MAIN_QUESTS: list[dict[str, Any]] = [
     },
     {
         'id': 'snow',
-        'name': '雪宝',
-        'mob': '雪傀儡',
+        'name': 'Snowy',
+        'mob': 'Snow Golem',
         'order': 5,
         'area': 'hub',
         'poi': 'snowArena',
@@ -94,8 +94,8 @@ MAIN_QUESTS: list[dict[str, Any]] = [
     },
     {
         'id': 'creeper',
-        'name': '嘶嘶',
-        'mob': '苦力怕',
+        'name': 'Hissy',
+        'mob': 'Creeper',
         'order': 6,
         'area': 'hub',
         'poi': 'clearing',
@@ -107,8 +107,8 @@ MAIN_QUESTS: list[dict[str, Any]] = [
     },
     {
         'id': 'bee',
-        'name': '嗡嗡',
-        'mob': '蜜蜂',
+        'name': 'Buzzy',
+        'mob': 'Bee',
         'order': 7,
         'area': 'hub',
         'poi': 'hive',
@@ -120,10 +120,10 @@ MAIN_QUESTS: list[dict[str, Any]] = [
     },
     {
         'id': 'ender',
-        'name': '小末',
-        'mob': '末影人',
+        'name': 'Endie',
+        'mob': 'Enderman',
         'order': 8,
-        'area': 'end',
+        'area': 'hub',
         'poi': 'endPortal',
         'gags': ['kai_steal', 'kai_cake_face'],
         'accessories': ['halo', 'beret', 'sunglasses'],
@@ -133,8 +133,8 @@ MAIN_QUESTS: list[dict[str, Any]] = [
     },
     {
         'id': 'wither',
-        'name': '三三',
-        'mob': '凋零',
+        'name': 'Trio',
+        'mob': 'Wither',
         'order': 9,
         'area': 'nether',
         'poi': 'netherPortal',
@@ -146,8 +146,8 @@ MAIN_QUESTS: list[dict[str, Any]] = [
     },
     {
         'id': 'villager',
-        'name': '翠翠',
-        'mob': '村民',
+        'name': 'Emma',
+        'mob': 'Villager',
         'order': 10,
         'area': 'hub',
         'poi': 'stall',
@@ -162,8 +162,8 @@ MAIN_QUESTS: list[dict[str, Any]] = [
 HIDDEN_CONTESTANTS: list[dict[str, Any]] = [
     {
         'id': 'dragon',
-        'name': '龙宝宝',
-        'mob': '末影龙',
+        'name': 'Baby Dragon',
+        'mob': 'Ender Dragon',
         'order': 11,
         'area': 'end',
         'poi': 'dragonEgg',
@@ -175,8 +175,8 @@ HIDDEN_CONTESTANTS: list[dict[str, Any]] = [
     },
     {
         'id': 'pinksheep',
-        'name': '粉粉',
-        'mob': '粉色羊',
+        'name': 'Pinky',
+        'mob': 'Pink Sheep',
         'order': 12,
         'area': 'hub',
         'poi': 'pinkTulip',
@@ -192,25 +192,27 @@ QUEST_BY_ID: dict[str, dict[str, Any]] = {q['id']: q for q in MAIN_QUESTS}
 ALL_CONTESTANTS: list[dict[str, Any]] = MAIN_QUESTS + HIDDEN_CONTESTANTS
 
 # Binding content floors from director #143 (ideal agent, seconds from activation; ceiling <= 90s).
+# #143 ideal-agent quest floors. v1.1: walking is 1.5x faster (user request), so every floor scales x0.8
+# (measured ideal medians shrank 1-22 %; quest content unchanged). v1.0 values in the comments.
 QUEST_IDEAL_FLOORS_S: dict[str, float] = {
-    'sheep': 20.0,
-    'slime': 25.0,
-    'cat': 25.0,
-    'golem': 50.0,
-    'snow': 20.0,
-    'creeper': 18.0,
-    'bee': 25.0,
-    'ender': 50.0,
-    'wither': 45.0,
-    'villager': 40.0,
+    'sheep': 16.0,     # 20
+    'slime': 20.0,     # 25
+    'cat': 20.0,       # 25
+    'golem': 40.0,     # 50
+    'snow': 16.0,      # 20
+    'creeper': 14.4,   # 18
+    'bee': 20.0,       # 25
+    'ender': 40.0,     # 50
+    'wither': 36.0,    # 45
+    'villager': 32.0,  # 40
 }
 
 TIERS: list[dict[str, Any]] = [
-    {'id': 'perfect', 'label': '完美', 'icon': '👑', 'color': '#c43bd8', 'order': 0},
-    {'id': 'gorgeous', 'label': '超漂亮', 'icon': '💎', 'color': '#3b5bdb', 'order': 1},
-    {'id': 'pretty', 'label': '漂亮', 'icon': '🌸', 'color': '#f2c318', 'order': 2},
-    {'id': 'okay', 'label': '一般', 'icon': '🙂', 'color': '#d9342b', 'order': 3},
-    {'id': 'tryhard', 'label': '再努力', 'icon': '💪', 'color': '#3fae3a', 'order': 4},
+    {'id': 'perfect', 'label': 'PERFECT', 'icon': '👑', 'color': '#c43bd8', 'order': 0},
+    {'id': 'gorgeous', 'label': 'GORGEOUS', 'icon': '💎', 'color': '#3b5bdb', 'order': 1},
+    {'id': 'pretty', 'label': 'PRETTY', 'icon': '🌸', 'color': '#f2c318', 'order': 2},
+    {'id': 'okay', 'label': 'OKAY', 'icon': '🙂', 'color': '#d9342b', 'order': 3},
+    {'id': 'tryhard', 'label': 'KEEP TRYING', 'icon': '💪', 'color': '#3fae3a', 'order': 4},
 ]
 TIER_IDS: list[str] = [t['id'] for t in TIERS]
 

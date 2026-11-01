@@ -32,6 +32,11 @@ export function createCameraRig(ctx) {
   const lerpNum = (a, b, t) => a + (b - a) * t;
   const clamp01 = (v) => Math.max(0, Math.min(1, v));
 
+  // Follow smoothing: exponential rate 9.5/s at the authored 4.3 b/s walk, scaled up with speed (v1.1).
+  const FOLLOW_RATE = 9.5;
+  const FOLLOW_REF_SPEED = 4.3;
+  let followSpeed = 0;
+
   function computeLensParams() {
     const w = window.innerWidth || 1280;
     const h = Math.max(1, window.innerHeight || 800);
@@ -230,6 +235,7 @@ export function createCameraRig(ctx) {
   }
 
   function snap() {
+    followSpeed = 0;
     fallbackShakeOffset.set(0, 0, 0);
     shakeIntensity = 0;
     shakeDuration = 0;
@@ -268,7 +274,12 @@ export function createCameraRig(ctx) {
       currentPos.copy(desiredPos);
       currentLook.copy(target);
     } else {
-      const rate = mode === 'focus' ? 14.0 : 9.5;
+      // v1.1: follow stiffness scales with walking speed so the steady trailing lag stays ~0.45 block
+      // (v / rate) at 6.5–7.8 b/s exactly as it was at 4.3 b/s — the player never drifts off-centre.
+      const ps = mode === 'follow' ? Number(ctx.player?.currentSpeed?.()) || 0 : 0;
+      followSpeed += (ps - followSpeed) * Math.min(1, safeDt * 6);
+      const followRate = FOLLOW_RATE * Math.min(2, Math.max(1, followSpeed / FOLLOW_REF_SPEED));
+      const rate = mode === 'focus' ? 14.0 : followRate;
       const alpha = Math.min(1, 1 - Math.exp(-rate * safeDt));
       currentPos.lerp(desiredPos, alpha);
       currentLook.lerp(target, alpha);

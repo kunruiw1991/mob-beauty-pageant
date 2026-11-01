@@ -7,6 +7,7 @@ export const MAX_PORTRAIT_BYTES = 12 * 1024;
 const memoryCache = {
   portraits: {},
   ghostHandShown: false,
+  voiceOff: false, // v1.1 voice-over toggle (pause menu); survives new games / restarts
 };
 
 function sanitizePortraits(portraits) {
@@ -32,6 +33,9 @@ export function loadProgress() {
     if (parsed.ghostHandShown) {
       memoryCache.ghostHandShown = true;
     }
+    if (typeof parsed.voiceOff === 'boolean') {
+      memoryCache.voiceOff = parsed.voiceOff;
+    }
     return parsed;
   } catch (_) {
     return null;
@@ -50,6 +54,9 @@ export function saveProgress(data = {}) {
     if (data.ghostHandShown !== undefined) {
       memoryCache.ghostHandShown = Boolean(data.ghostHandShown);
     }
+    if (data.voiceOff !== undefined) {
+      memoryCache.voiceOff = Boolean(data.voiceOff);
+    }
     const payload = {
       v: 1,
       seed: data.seed ?? prev.seed ?? 1,
@@ -62,6 +69,7 @@ export function saveProgress(data = {}) {
       rival: data.rival ?? prev.rival ?? null,
       portraits: mergedPortraits,
       ghostHandShown: memoryCache.ghostHandShown || Boolean(prev.ghostHandShown),
+      voiceOff: Boolean(memoryCache.voiceOff),
       savedAt: Date.now(),
     };
     if (data.replaceBoard && data.board) payload.board = { ...data.board };
@@ -127,6 +135,8 @@ export function clearProgress(opts = {}) {
     window.localStorage.removeItem(STORAGE_KEY);
     if (opts.keepPortraits && Object.keys(memoryCache.portraits).length > 0) {
       saveProgress({ portraits: memoryCache.portraits, ghostHandShown: memoryCache.ghostHandShown });
+    } else if (memoryCache.voiceOff) {
+      saveProgress({}); // keep the voice-over preference across new games
     }
     return true;
   } catch (_) {
@@ -175,6 +185,14 @@ export const progress = Object.freeze({
   markGhostHandShown() {
     memoryCache.ghostHandShown = true;
     saveProgress({ ghostHandShown: true });
+  },
+  getVoiceOff() {
+    loadProgress();
+    return Boolean(memoryCache.voiceOff);
+  },
+  setVoiceOff(off) {
+    memoryCache.voiceOff = Boolean(off);
+    return saveProgress({ voiceOff: Boolean(off) });
   },
 });
 

@@ -124,6 +124,11 @@ export function createSeam(ctx) {
       ctx.audio?.setMuted?.(b);
       return true;
     },
+
+    // v1.1: voice-over status (enabled/unlocked, requested/played/failed counts, current line + subtitle).
+    voiceInfo() {
+      return deepClone(ctx.voice?.info?.() || null);
+    },
   };
 
   Object.freeze(seam);

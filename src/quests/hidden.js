@@ -4,6 +4,7 @@
 // Also provides createHiddenController(ctx) for passive world discovery + sparkle hints after quest 5.
 
 import * as THREE from '../../vendor/three.module.min.js';
+import { CONTESTANT_NAMES, QUEST_LABELS } from '../data/strings.js';
 import { B } from '../world/blocks.js';
 import {
   poi,
@@ -319,7 +320,7 @@ export const dragonQuest = {
       id: 'dragon_egg',
       targetId: 'dragon_egg',
       kind: 'entity',
-      label: '龙蛋',
+      label: QUEST_LABELS.hidden.dragonEgg,
       area: 'end',
       hitRadius: 1.25,
     });
@@ -439,7 +440,7 @@ export const dragonQuest = {
           id: 'dragon_portal',
           pos: { x: ep.x, y: ep.y + 0.5, z: ep.z },
           kind: 'portal',
-          label: '前往末地',
+          label: QUEST_LABELS.hidden.goToEnd,
           range: 2.2,
         },
       ];
@@ -450,7 +451,7 @@ export const dragonQuest = {
           id: 'dragon_hatching',
           pos: { x: currentEggPos.x, y: currentEggPos.y + 0.9, z: currentEggPos.z },
           kind: 'entity',
-          label: '龙宝宝',
+          label: CONTESTANT_NAMES.dragon,
           range: 3.5,
         },
       ];
@@ -464,7 +465,7 @@ export const dragonQuest = {
             ? { x: 153.2, y: currentEggPos.y + 0.5, z: 26.5 }
             : { x: currentEggPos.x, y: currentEggPos.y + 0.5, z: currentEggPos.z },
         kind: 'entity',
-        label: '神秘龙蛋',
+        label: QUEST_LABELS.hidden.mysteryEgg,
         range: 2.9,
       },
     ];
@@ -593,7 +594,7 @@ export const pinksheepQuest = {
       sparkleColor: 0xff8fab,
       size: 0.46,
       autoPickupRadius: 1.75,
-      label: '粉红郁金香',
+      label: QUEST_LABELS.hidden.pinkTulip,
       pitch: 1.25,
       onCollect: () => {
         hasPinkTulip = true;
@@ -620,7 +621,7 @@ export const pinksheepQuest = {
         targetId: 'white_sheep',
         entityId: 'pink_white_sheep',
         kind: 'entity',
-        label: '小白羊',
+        label: QUEST_LABELS.hidden.whiteSheep,
         hitRadius: 1.15,
       });
     }
@@ -667,7 +668,7 @@ export const pinksheepQuest = {
           id: 'pinksheep_finishing',
           pos: { x: whiteSheepPos.x, y: whiteSheepPos.y + 0.8, z: whiteSheepPos.z },
           kind: 'entity',
-          label: '粉粉',
+          label: CONTESTANT_NAMES.pinksheep,
           range: 3.5,
         },
       ];
@@ -681,7 +682,7 @@ export const pinksheepQuest = {
         id: 'white_sheep',
         pos: { x: whiteSheepPos.x, y: whiteSheepPos.y + 0.75, z: whiteSheepPos.z },
         kind: 'entity',
-        label: '把粉郁金香送给小白羊',
+        label: QUEST_LABELS.hidden.giveTulip,
         range: 2.8,
       },
     ];

@@ -15,7 +15,8 @@ diamonds** (9:25), the **bank with emerald blocks** (9:35) and the **passcode ch
 **Kid rules (non-negotiable):** contestants are 生物选手, chibi + fully clothed (head ≈ 40 % of height, no curves —
 NOT the cover's style). Humor comes from quests, the rival and gags, never from mocking looks. No fail states, no
 damage, no death, no scary music; lava is scenery you can never fall into. Touch-first, show-don't-tell, ≤ 12 Chinese
-characters visible in any one HUD string, zero `speechSynthesis`.
+characters visible in any one HUD string, zero `speechSynthesis`. **v1.1: the game is English (≤ 24 characters per HUD
+string, zero Chinese characters in DOM or canvas) with pre-recorded voice-over — see §12.**
 
 ---------------------------------------------------------------------------------------------------------------------
 ## 1. Tech frame (binding)
@@ -198,7 +199,8 @@ pants. 小凯: cyan tee, dark hair, mischievous grin. 贝拉: orange fox hoodie.
 - `poi` keys: spawn plaza board runway stage meadow hive swamp cave villageSquare statue pumpkins ironAltar bank stall
   snow snowArena shrine endPortal netherPortal kaiHouse prison prisonCell jungle clearing pinkTulip endArrive endCage
   dragonEgg netherArrive fortress soulSand witherAltar.
-- Walking: 4.3 blocks/s (5.2 when path > 20). Tap on any block → walk to nearest walkable cell; portals = walk in.
+- Walking: ~~4.3~~ **6.5 blocks/s (7.8 when path > 20; crouch-sneak 2.4) since v1.1** — leg cadence scales with speed,
+  facing slews, corners round off (§12). Tap on any block → walk to nearest walkable cell; portals = walk in.
 
 ## 6. Quest flow (order = beacon order; each ≤ 90 s for the ideal agent; NO menus — tap/drag only)
 
@@ -285,7 +287,7 @@ Every world tap → `fx.ring` (walk, white) / interact pulse (yellow) / `fx.wobb
 100 ms. Block hit → crack overlay + 4 chips; break → 12–16 textured cubes + pop; collect → XP orbs fly to player +
 rising-pitch ding; quest complete → ≥ 60 particles + jingle + hearts; golem/wither spawn → `shake(0.6, 0.5)` + rumble;
 完美 → confetti ≥ 150 + fireworks; slapstick sfx for 小凯 (boing, splash, wiggle, faint "噗通"). Footstep dust puffs.
-WebAudio only (no files, no speech): procedural SFX names `step_grass step_stone step_snow tap blocked hit_stone
+WebAudio only (no speech; since v1.1 the only audio files are the voice-over clips of §12): procedural SFX names `step_grass step_stone step_snow tap blocked hit_stone
 hit_wood hit_soft break pickup xp pop boing splash hiss confetti snow_throw snow_hit vwoop rumble thunder wither_spawn
 golem_spawn hrrm meow baa buzz kai_laugh kai_whine shutter cheer aww clap fanfare drumroll munch sneeze kaching portal
 snip note0..note5`; music tracks `title overworld nether end runway finale` (C418-ish pentatonic overworld; drone
@@ -302,15 +304,15 @@ instanced pools; **≤ 150 draw calls and ≤ 200k triangles** in the busiest fr
 | Gate | Target |
 |---|---|
 | F1 first contact | autoplay agent meets 花花 (sheep quest started) ≤ 20 s and finishes sheep quest ≤ 60 s from title tap in ≥ 90 % seeds |
-| F2 quests completable | random-ish agent (random target order, 0.3–1.2 s delays, 20 % wasted taps) completes every quest ≤ 120 s in ≥ 95 % (10 quests × 20 seeds); ideal agent ≤ 90 s each |
+| F2 quests completable | random-ish agent (random target order, 0.3–1.2 s delays, 20 % wasted taps) completes every quest ≤ 120 s in ≥ 95 % (10 quests × 20 seeds); ideal agent ≤ 90 s each (and ≥ the #143 floors, scaled ×0.8 in v1.1 for 1.5× walking) |
 | F3 zero dead taps | 500 random canvas taps across hub/end/nether/quests → `feedback.dead == 0`, feedback ≤ 100 ms |
 | F4 funny beat per quest | every completed quest has ≥ 1 gag in `quests[id].gags`; 小凯 `appearances` ≥ 7 distinct quests |
 | F5 board drag | CDP touch drag tray→row works for all 5 rows at 390×844 and 844×390, mouse at 1280×800; tap-tap fallback 5/5 |
 | F6 performance | rAF p95 ≤ 25 ms at 1280×800 (headless; if SwiftShader baseline of an empty scene already exceeds 12 ms, gate = p95 ≤ 2× baseline), calls ≤ 150, tris ≤ 200k, no memory growth |
-| F7 session length | ideal agent full run ≤ 14 min game time; random-ish median 15–25 min |
+| F7 session length | ideal agent full run ≤ 14 min game time; random-ish median ~~15–25~~ 12–25 min (v1.1: 1.5× walking) |
 | F8 boot | title visible ≤ 1.5 s, world interactive ≤ 4 s after ▶, 0 console errors |
 | F9 rival beat | steal fires in 100 % seeds; prison rescue ≤ 90 s for random-ish in ≥ 90 % |
-| F10 show-don't-tell | `quest.pointer` non-null 100 % of active-quest frames; no HUD string > 12 CJK chars |
+| F10 show-don't-tell | `quest.pointer` non-null 100 % of active-quest frames; no HUD string > 12 CJK chars (v1.1: 0 CJK, ≤ 24 chars) |
 | F11 determinism | same seed + same input script → identical `getState()` JSON at 3600 frames (3/3) |
 | F12 layout | 4 viewports: 0 scrollbars, 0 overlaps, targets ≥ 68 px, ≤ 5 controls in play |
 | F13 juice | each quest complete → ≥ 60 particles + ≥ 1 sfx within 0.5 s; 完美 → confetti ≥ 150 |
@@ -319,3 +321,48 @@ instanced pools; **≤ 150 draw calls and ≤ 200k triangles** in the busiest fr
 Director's eye gate (not automatable): 2–3 play loops at 1280×800 and 844×390 in gbrowser; "is it funny and cute like
 the video?" — every quest must have a visible laugh moment, the wall must look like the video's wall, the contestants
 must be distinct at a glance. Cosmetic-only fixes are rejected when the ask was a feel problem.
+
+---------------------------------------------------------------------------------------------------------------------
+## 12. v1.1 — faster walking, English, voice-over (owner: pageant-v11)
+
+The family played v1.0 and asked for exactly three things: faster movement, English, and voice-over. Nothing else
+changed in the design; every §1–§11 rule still binds except where this section amends it.
+
+**12.1 Faster walking.** `src/core/player.js`: walk 6.5 b/s (was 4.3), long paths > 20 blocks 7.8 (was 5.2),
+crouch-sneak in the cat quest 2.4 (was 1.6) — all exactly 1.5×, exported as `PLAYER_CONFIG` and mirrored in
+`getState().config`. The walk/run/sneak animation clock runs at speed ÷ authored speed (`actor.gaitRate`, accumulated
+as a phase so legs never jump) and footsteps land twice per leg cycle. Facing slews at 16/s instead of snapping at
+every waypoint, and the walker retargets the next waypoint 0.42 block before a corner, so fast walks along the
+octile voxel paths curve instead of zigzagging. The follow camera's exponential stiffness scales with walking speed
+(9.5/s × speed/4.3, capped ×2) so the trailing lag stays ~0.45 block exactly as at 4.3 b/s, and the renderer draws
+the player + camera at the interpolated sub-step pose (60 Hz sim on 120 Hz / uneven rAF never judders; sim state is
+restored after the draw, so sims and determinism are untouched). The quest manager also guards cross-area strays:
+if the player wanders back through a portal mid-quest, targets/beacon point at that area's portal home instead of
+an unreachable spot (found by F7 when the faster walk changed a random-ish run). Scripted NPC paces (rival patrols,
+contestant wanders) are unchanged so the rival beats stay winnable; F1/F2/F9 re-run on 20 seeds. Gates amended for
+the user's request: the #143 ideal-agent floors scale ×0.8 (measured quest times shrank 1–22 %, content unchanged)
+and F7's random-ish median lower bound drops from 15 to 12 minutes.
+
+**12.2 English.** Every user-visible string (title, HUD, pause menu, booth, board, final screen, share PNG, tier wall
+label tiles, speech bubbles, agent target labels) is short kid-friendly English, centralized in `src/data/strings.js`
+and `src/data/roster.js`; `<html lang="en">`. Names keep the pun/mob: Blossom (sheep), Bobo (slime), Mimi (cat), Tinny
+(iron golem), Snowy (snow golem), Hissy (creeper), Buzzy (bee), Endie (enderman), Trio (wither), Emma (villager), Baby
+Dragon, Pinky (pink sheep); Chen (player), Kai (rival), Bella, Mr. Question. Tier rows: PERFECT 👑 · GORGEOUS 💎 ·
+PRETTY 🌸 · OKAY 🙂 · KEEP TRYING 💪 — every row still a happy row. E2E T42 asserts zero `[\u4e00-\u9fff]` in
+`document.title`, `body.innerText`, aria/title attributes and every canvas `fillText`/`strokeText` call.
+
+**12.3 Voice-over.** Pre-recorded clips only (still zero `speechSynthesis`): `tools/gen_voice.py` holds the single
+line list (id → speaker → text), renders it with edge-tts neural voices (narrator + contestants `en-US-AnaNeural`
+with a per-personality rate/pitch, Kai `en-US-GuyNeural`, Bella `en-US-JennyNeural`, Mr. Question
+`en-US-ChristopherNeural` −10 Hz), trims/tightens silences and loudness-normalizes with ffmpeg into
+`assets/voice/<id>.mp3` (mono 24 kHz 48 kbps, ≤ 6 MB total) and writes the manifest `src/data/voice_lines.js`.
+Lines: welcome / welcome back, per contestant intro (first meeting) + quest hint + quest-complete cheer, shared tier
+reactions for 4 personality groups (sweet, bouncy, cool, spooky; played with a per-contestant playback tint), Kai's
+gags (bounced, hat, pumpkins, snowman, honey, steal, cake face, faint, finale "Rank me!" + 5 row reactions), Bella,
+Mr. Question, booth ("Strike a pose!"), board ("Drag her picture to a row!"), next, secret found, finale, results,
+End/Nether arrivals. `src/fx/voice.js` listens to the §3.2 events, decodes each clip once with the shared WebAudio
+context (unlocked on the first gesture; auto-repeat keydowns ignored), plays one line at a time (new line cancels;
+follow-ups queue with a bounded wait; chatter is skipped while someone talks), ducks the BGM −6 dB, and shows the
+line as a big English subtitle (≥ 20 px, auto-hides, steers clear of buttons/trays). The Voice 🔊/🔇 toggle sits in
+the pause menu next to Music/Sounds (no new play-time control) and persists in `pageant_progress.voiceOff`. A missing
+or undecodable clip never throws or blocks play; `state.stats.voice` counts logical line requests deterministically.

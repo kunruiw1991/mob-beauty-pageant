@@ -2,6 +2,7 @@
 // Zero-build ES2022, deterministic sim time/rng only.
 
 import * as THREE from '../../vendor/three.module.min.js';
+import { CONTESTANT_NAMES, QUEST_LABELS } from '../data/strings.js';
 import {
   poi,
   surfaceY,
@@ -22,12 +23,12 @@ import {
 const ROUND_LENGTHS = [3, 4, 5];
 const RING_RADIUS = 4.4;
 const FLOWER_PALETTE = [
-  { color: 0xe63946, sfx: 'note0', label: '红花' },
-  { color: 0xf77f00, sfx: 'note1', label: '橙花' },
-  { color: 0xffd43b, sfx: 'note2', label: '黄花' },
-  { color: 0x3fae3a, sfx: 'note3', label: '绿花' },
-  { color: 0x3b82f6, sfx: 'note4', label: '蓝花' },
-  { color: 0xb5179e, sfx: 'note5', label: '紫花' },
+  { color: 0xe63946, sfx: 'note0', label: QUEST_LABELS.bee.redFlower },
+  { color: 0xf77f00, sfx: 'note1', label: QUEST_LABELS.bee.orangeFlower },
+  { color: 0xffd43b, sfx: 'note2', label: QUEST_LABELS.bee.yellowFlower },
+  { color: 0x3fae3a, sfx: 'note3', label: QUEST_LABELS.bee.greenFlower },
+  { color: 0x3b82f6, sfx: 'note4', label: QUEST_LABELS.bee.blueFlower },
+  { color: 0xb5179e, sfx: 'note5', label: QUEST_LABELS.bee.purpleFlower },
 ];
 
 // Pooled 3D flower ring + sticky honey trap (reused across restarts — 0 memory growth)
@@ -432,7 +433,7 @@ const qBee = {
           id: 'bee_done_wait',
           pos: { x: ringCenter.x, y: ringCenter.y, z: ringCenter.z },
           kind: 'wait',
-          label: '嗡嗡',
+          label: CONTESTANT_NAMES.bee,
           range: 2.3,
         },
       ];
@@ -460,7 +461,7 @@ const qBee = {
         id: 'bee_demo_wait',
         pos: { x: ringCenter.x, y: ringCenter.y, z: ringCenter.z },
         kind: 'wait',
-        label: '看嗡嗡飞',
+        label: QUEST_LABELS.bee.watchBuzzy,
         range: 2.4,
       },
     ];

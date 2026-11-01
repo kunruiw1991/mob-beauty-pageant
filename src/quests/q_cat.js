@@ -1,8 +1,9 @@
 // Quest 3: cat — 喵喵 (Jungle Red-Light/Green-Light Sneak + Fish + 小凯's Stolen Hat, docs/DESIGN.md §6.3 & #143).
-// #143 mechanics: start >= 12 blocks away; within 10 blocks of 喵喵 the player auto-SNEAKS (MC crouch, 1.6 b/s, crouch anim);
+// #143 mechanics: start >= 12 blocks away; within 10 blocks of 喵喵 the player auto-SNEAKS (MC crouch, 2.4 b/s since v1.1, crouch anim);
 // red-light peeks every 3-5 s actually catch movers; 3-fish shy cat taming across jungle log perches + mercy after 3 leaps.
 
 import * as THREE from '../../vendor/three.module.min.js';
+import { CONTESTANT_NAMES, QUEST_LABELS } from '../data/strings.js';
 import {
   surfaceY,
   playerPos,
@@ -24,7 +25,7 @@ import {
 } from './kit.js';
 
 const SNEAK_RADIUS = 10.0;
-const SNEAK_SPEED = 1.6;
+const SNEAK_SPEED = 2.4; // v1.1: matches player.js SNEAK_SPEED (1.5x faster movement)
 const NEED_FISH = 5;
 const LOG_PERCH_LIFT = 0.34;
 
@@ -383,7 +384,7 @@ const qCat = {
         targetId: 'cat_target',
         entityId: 'cat',
         kind: 'entity',
-        label: '喵喵',
+        label: CONTESTANT_NAMES.cat,
         hitRadius: 1.2,
       });
 
@@ -420,7 +421,7 @@ const qCat = {
     const sneakRef = leapArc ? leapArc.to : catPos;
     const dRaw = distXZ(rawPp, sneakRef);
 
-    // #143: Within 10 blocks of 喵喵 the player auto-SNEAKS (MC crouch, 1.6 b/s, crouch anim)
+    // #143: Within 10 blocks of 喵喵 the player auto-SNEAKS (MC crouch, 2.4 b/s since v1.1, crouch anim)
     const shouldSneak = !fishInHand && !finishing && !mercyWalking && dRaw <= SNEAK_RADIUS;
     setPlayerSneak(ctx, shouldSneak);
     if (shouldSneak) {
@@ -559,7 +560,7 @@ const qCat = {
           id: 'cat_finishing_wait',
           pos: { x: catPos.x, y: catPos.y + 0.8, z: catPos.z },
           kind: 'wait',
-          label: '喵喵',
+          label: CONTESTANT_NAMES.cat,
           range: 2.5,
         },
       ];
@@ -572,7 +573,7 @@ const qCat = {
           id: 'cat_hop_wait',
           pos: { x: pp.x, y: pp.y + 0.5, z: pp.z },
           kind: 'wait',
-          label: '喵喵跳走啦',
+          label: QUEST_LABELS.cat.hopped,
           range: 2.5,
         },
       ];
@@ -584,7 +585,7 @@ const qCat = {
           id: 'cat_offer_fish',
           pos: { x: catPos.x, y: catPos.y + 0.7, z: catPos.z },
           kind: 'entity',
-          label: '喂小鱼给喵喵',
+          label: QUEST_LABELS.cat.feedFish,
           range: 2.4,
         },
       ];
@@ -598,7 +599,7 @@ const qCat = {
           id: 'cat_hold_still',
           pos: { x: pp.x, y: pp.y + 0.5, z: pp.z },
           kind: 'hold',
-          label: '别动！等转头',
+          label: QUEST_LABELS.cat.freezeWait,
           range: 2.5,
         },
       ];
@@ -609,7 +610,7 @@ const qCat = {
         id: 'cat_sneak',
         pos: { x: catPos.x, y: catPos.y + 0.6, z: catPos.z },
         kind: 'entity',
-        label: '悄悄靠近喵喵',
+        label: QUEST_LABELS.cat.sneakClose,
         range: 2.1,
       },
     ];

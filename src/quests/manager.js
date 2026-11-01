@@ -205,8 +205,53 @@ export function buildQuestManager(ctx, mainQuests = [], hiddenQuests = [], creat
     }
   }
 
+  // v1.1 guard: the three areas live side by side in one grid (hub x < 96, End 128..176, Nether 192..240). If the
+  // player wanders back through a portal mid-quest (easy at the faster walking speed), every target of the active
+  // quest sits in another pocket and is unreachable — so the beacon + targets point at this area's portal home.
+  function areaOfX(x) {
+    const v = Number(x) || 0;
+    if (v >= 192) return 'nether';
+    if (v >= 128) return 'end';
+    return 'hub';
+  }
+
+  function crossAreaReturnTarget(q) {
+    if (!q || !ctx?.state) return null;
+    const here = ctx.state.area || 'hub';
+    const spots = [];
+    let list = null;
+    try {
+      list = q.targets?.(ctx);
+    } catch (_) {
+      list = null;
+    }
+    if (Array.isArray(list)) {
+      for (const t of list) {
+        if (t?.pos && Number.isFinite(t.pos.x)) spots.push(t.pos);
+      }
+    }
+    const ptr = q.pointer?.(ctx);
+    if (ptr && Number.isFinite(ptr.x)) spots.push(ptr);
+    if (spots.length === 0 || spots.some((p) => areaOfX(p.x) === here)) return null;
+    const there = areaOfX(spots[0].x);
+    const key =
+      here === 'end' ? 'endExit' : here === 'nether' ? 'netherExit' : there === 'end' ? 'endPortal' : 'netherPortal';
+    const p = poi(ctx, key);
+    return {
+      id: `${q.id}_portal_home`,
+      pos: { x: p.x, y: p.y ?? 8, z: p.z },
+      kind: 'block',
+      label: 'Portal',
+      range: 0.9,
+    };
+  }
+
   function computeSafePointer(q) {
     if (!q) return null;
+    const back = crossAreaReturnTarget(q);
+    if (back) {
+      return { x: back.pos.x, y: (back.pos.y ?? 8) + 1, z: back.pos.z };
+    }
     const rawPtr = q.pointer?.(ctx);
     if (rawPtr && Number.isFinite(rawPtr.x) && Number.isFinite(rawPtr.z)) {
       return { x: rawPtr.x, y: rawPtr.y ?? 9, z: rawPtr.z };
@@ -380,6 +425,8 @@ export function buildQuestManager(ctx, mainQuests = [], hiddenQuests = [], creat
   function targets() {
     ensureState();
     if (activeQuest) {
+      const back = crossAreaReturnTarget(activeQuest);
+      if (back) return [back];
       const list = activeQuest.targets?.(ctx);
       if (Array.isArray(list) && list.length > 0) {
         return list.map((t, idx) => ({

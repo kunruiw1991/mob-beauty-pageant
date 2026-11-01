@@ -2,6 +2,7 @@
 // dig 4 deep soul sand mounds, place 7-slot T altar -> shake + thunder + 三三 sneezes blue skull -> balloon, §6.9).
 
 import * as THREE from '../../vendor/three.module.min.js';
+import { CONTESTANT_NAMES, MOB_NAMES, QUEST_LABELS } from '../data/strings.js';
 import { B } from '../world/blocks.js';
 import {
   poi,
@@ -87,13 +88,13 @@ const SOUL_SAND_BLOCKS = [
 
 // 7 Ghost Slots at Wither Altar: 4 Soul Sand T + 3 Wither Skulls
 const ALTAR_SLOTS = [
-  { dx: 0, dy: 0, kind: 'sand', label: '灵魂沙底座' },
-  { dx: -1, dy: 1, kind: 'sand', label: '灵魂沙左臂' },
-  { dx: 0, dy: 1, kind: 'sand', label: '灵魂沙中心' },
-  { dx: 1, dy: 1, kind: 'sand', label: '灵魂沙右臂' },
-  { dx: -1, dy: 2, kind: 'skull', label: '左骷髅头' },
-  { dx: 0, dy: 2, kind: 'skull', label: '中骷髅头' },
-  { dx: 1, dy: 2, kind: 'skull', label: '右骷髅头' },
+  { dx: 0, dy: 0, kind: 'sand', label: QUEST_LABELS.wither.sandBase },
+  { dx: -1, dy: 1, kind: 'sand', label: QUEST_LABELS.wither.sandLeft },
+  { dx: 0, dy: 1, kind: 'sand', label: QUEST_LABELS.wither.sandCenter },
+  { dx: 1, dy: 1, kind: 'sand', label: QUEST_LABELS.wither.sandRight },
+  { dx: -1, dy: 2, kind: 'skull', label: QUEST_LABELS.wither.skullLeft },
+  { dx: 0, dy: 2, kind: 'skull', label: QUEST_LABELS.wither.skullCenter },
+  { dx: 1, dy: 2, kind: 'skull', label: QUEST_LABELS.wither.skullRight },
 ];
 
 // Pooled sneeze blue-skull -> >= 0.85b bright sky-blue skull-balloon prop (0 geometry/material growth across restarts)
@@ -268,7 +269,7 @@ function setupNetherQuest(ctx) {
         targetId: `wither_skel_${s.index}`,
         entityId: `wither_skel_${s.index}`,
         kind: 'entity',
-        label: '凋零骷髅',
+        label: MOB_NAMES.witherSkeleton,
         hitRadius: 1.15,
       });
     }
@@ -293,7 +294,7 @@ function setupNetherQuest(ctx) {
         blockId: B.SOUL_SAND,
         sfxHit: 'hit_soft',
         sfxBreak: 'hit_soft',
-        label: '挖灵魂沙',
+        label: QUEST_LABELS.wither.digSoulSand,
         range: 2.3,
         onBreak: () => {
           sandDug += 1;
@@ -613,7 +614,7 @@ const qWither = {
   targets(ctx) {
     if (phase === 'to_nether' || (phase !== 'summon' && ctx?.state?.area && ctx.state.area !== 'nether')) {
       const np = poi(ctx, 'netherPortal', { x: 12.5, y: 8, z: 30.5 });
-      return [{ id: 'wither_portal', pos: { x: np.x, y: 8, z: np.z }, kind: 'block', label: '进下界门', range: 2.2 }];
+      return [{ id: 'wither_portal', pos: { x: np.x, y: 8, z: np.z }, kind: 'block', label: QUEST_LABELS.wither.enterNetherPortal, range: 2.2 }];
     }
 
     if (phase === 'skulls') {
@@ -625,7 +626,7 @@ const qWither = {
             id: `wither_skel_${s.index}`,
             pos: { x: p.x, y: p.y, z: p.z },
             kind: 'entity',
-            label: '摘骷髅头',
+            label: QUEST_LABELS.wither.popSkull,
             range: 2.3,
           },
         ];
@@ -640,7 +641,7 @@ const qWither = {
               id: sb.id,
               pos: { x: sb.pos.x, y: 8, z: sb.pos.z },
               kind: 'block',
-              label: '挖灵魂沙',
+              label: QUEST_LABELS.wither.digSoulSand,
               range: 2.3,
             },
           ];
@@ -682,7 +683,7 @@ const qWither = {
       if (skullTargets.length > 0) return skullTargets;
     }
 
-    return [{ id: 'wither_summon_wait', pos: { x: ALTAR_BASE.x, y: 8, z: ALTAR_BASE.z + 2.4 }, kind: 'wait', label: '三三', range: 2.4 }];
+    return [{ id: 'wither_summon_wait', pos: { x: ALTAR_BASE.x, y: 8, z: ALTAR_BASE.z + 2.4 }, kind: 'wait', label: CONTESTANT_NAMES.wither, range: 2.4 }];
   },
 
   pointer(ctx) {

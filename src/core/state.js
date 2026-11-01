@@ -1,6 +1,7 @@
 // Live mutable game state & JSON-safe deep clone per docs/DESIGN.md §3.10, §8.6 (owner: core).
 import { ROSTER } from '../data/roster.js';
 import { normalizeSeedNumber } from './rng.js';
+import { PLAYER_CONFIG } from './player.js';
 
 export const MAIN_QUEST_IDS = Object.freeze(
   ROSTER.filter((r) => !r.hidden)
@@ -91,6 +92,7 @@ export function createInitialState(seed = 12345) {
       shakes: 0,
       confetti: 0,
       fireworks: 0,
+      voice: 0,
     },
     gagCam: {
       count: 0,
@@ -242,7 +244,9 @@ export function snapshotState(state) {
       shakes: state.stats?.shakes | 0,
       confetti: state.stats?.confetti | 0,
       fireworks: state.stats?.fireworks | 0,
+      voice: state.stats?.voice | 0, // v1.1: logical voice-over line requests (deterministic, like sounds)
     },
+    config: { ...PLAYER_CONFIG }, // v1.1: movement constants for tests (walk 6.5 b/s, long walk 7.8, sneak 2.4)
     gagCam: {
       count: state.gagCam?.count | 0,
       lastGag: state.gagCam?.lastGag ?? null,

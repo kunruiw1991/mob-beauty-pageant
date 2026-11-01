@@ -104,17 +104,26 @@ export function bindTap(el, handler, opts = {}) {
 
 export function clampCjk(str, maxChars = 12) {
   if (!str) return '';
+  const text = String(str);
   const cjkRe = /[\u4e00-\u9fff]/;
-  let count = 0;
-  let out = '';
-  for (const ch of String(str)) {
-    if (cjkRe.test(ch)) {
-      if (count >= maxChars) break;
-      count += 1;
+  if (cjkRe.test(text)) {
+    let count = 0;
+    let out = '';
+    for (const ch of text) {
+      if (cjkRe.test(ch)) {
+        if (count >= maxChars) break;
+        count += 1;
+      }
+      out += ch;
     }
-    out += ch;
+    return out;
   }
-  return out;
+  const maxLatin = Math.min(24, Math.max(maxChars, maxChars * 2));
+  if (text.length <= maxLatin) return text;
+  const sliced = text.slice(0, maxLatin - 1);
+  const lastSpace = sliced.lastIndexOf(' ');
+  const trimmed = lastSpace >= Math.floor(maxLatin * 0.6) ? sliced.slice(0, lastSpace) : sliced;
+  return `${trimmed.trimEnd()}…`;
 }
 
 export function formatDurationMs(ms) {

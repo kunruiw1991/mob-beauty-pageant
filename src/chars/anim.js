@@ -38,8 +38,15 @@ export function resetRigPose(actor) {
 }
 
 export function applyActorAnim(actor, dt) {
+  const prevAnimTime = actor.animTime;
   actor.animTime += dt;
   const t = actor.animTime;
+  // v1.1 gait clock: locomotion cycles (walk/run/sneak legs, bounce, footfalls) run at actor.gaitRate
+  // (the player sets speed / authored speed, so leg swing frequency scales with walking speed). Accumulated
+  // as a phase so a rate change never makes the legs jump; actors without gaitRate are unchanged.
+  const gaitRate = actor.gaitRate > 0 ? actor.gaitRate : 1;
+  actor.gaitTime = prevAnimTime === 0 ? dt * gaitRate : (actor.gaitTime || 0) + dt * gaitRate;
+  const gt = actor.gaitTime;
   const isKai = actor.kind === 'kai';
   let name = normalizeAnimName(actor.anim);
   if (isKai && actor.finaleActive && (name === 'walk' || name === 'run' || name === 'idle')) {
@@ -124,7 +131,7 @@ export function applyActorAnim(actor, dt) {
       const isRun = name === 'run';
       const freq = (isRun ? 11.5 : 7.6) * (isKai ? 1.15 : 1);
       const amp = (isRun ? 0.88 : 0.58) * (isKai ? 1.35 : 1);
-      const s = Math.sin(t * freq);
+      const s = Math.sin(gt * freq);
       if (legL) legL.rotation.x = s * amp;
       if (legR) legR.rotation.x = -s * amp;
       if (armL) {
@@ -140,12 +147,12 @@ export function applyActorAnim(actor, dt) {
         if (armL) { armL.rotation.x = -2.85; armL.rotation.z = -0.25; }
         if (armR) { armR.rotation.x = -2.85; armR.rotation.z = 0.25; }
       }
-      const bounce = Math.abs(Math.cos(t * freq));
+      const bounce = Math.abs(Math.cos(gt * freq));
       rig.position.y = bounce * (isRun ? 0.14 : 0.08) * slap;
       const sy = 1 + (bounce - 0.5) * 0.05;
       rig.scale.set(1 / Math.sqrt(sy), sy, 1 / Math.sqrt(sy));
       if (head) {
-        head.rotation.z = Math.sin(t * freq * 0.5) * 0.05 * slap;
+        head.rotation.z = Math.sin(gt * freq * 0.5) * 0.05 * slap;
         head.rotation.x = isRun ? 0.08 : 0;
       }
       if (isKai && isRun && body) body.rotation.x = -0.14; // goofy lean-back cartoon sprint
@@ -302,7 +309,7 @@ export function applyActorAnim(actor, dt) {
     }
 
     case 'sneak': {
-      const s = Math.sin(t * 4.8);
+      const s = Math.sin(gt * 4.8);
       rig.position.y = -0.10;
       if (body) body.rotation.x = 0.28 * slap;
       if (head) head.rotation.x = -0.15;

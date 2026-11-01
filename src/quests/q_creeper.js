@@ -2,6 +2,7 @@
 // happy confetti boom + flower heart crater, docs/DESIGN.md §6.6 & #143).
 
 import * as THREE from '../../vendor/three.module.min.js';
+import { CONTESTANT_NAMES, QUEST_LABELS } from '../data/strings.js';
 import {
   surfaceY,
   playerPos,
@@ -206,7 +207,7 @@ const qCreeper = {
         targetId: 'creeper_pat',
         entityId: 'creeper',
         kind: 'entity',
-        label: '拍拍嘶嘶',
+        label: QUEST_LABELS.creeper.patHissy,
         hitRadius: 1.25,
       });
 
@@ -434,7 +435,7 @@ const qCreeper = {
           id: 'creeper_finishing_wait',
           pos: { x: centerPos.x, y: centerPos.y + 0.85, z: centerPos.z },
           kind: 'wait',
-          label: '嘶嘶',
+          label: CONTESTANT_NAMES.creeper,
           range: 2.5,
         },
       ];
@@ -447,7 +448,7 @@ const qCreeper = {
           id: 'creeper_hop_wait',
           pos: { x: pp.x, y: pp.y + 0.85, z: pp.z },
           kind: 'wait',
-          label: '跟着嘶嘶',
+          label: QUEST_LABELS.creeper.followHissy,
           range: 2.5,
         },
       ];
@@ -459,7 +460,7 @@ const qCreeper = {
           id: 'creeper_approach',
           pos: { x: centerPos.x, y: centerPos.y + 0.85, z: centerPos.z },
           kind: 'entity',
-          label: '靠近安慰嘶嘶',
+          label: QUEST_LABELS.creeper.comfortHissy,
           range: 2.4,
         },
       ];
@@ -471,7 +472,7 @@ const qCreeper = {
           id: 'creeper_pat',
           pos: { x: centerPos.x, y: centerPos.y + 0.85, z: centerPos.z },
           kind: 'entity',
-          label: '趁闪光拍嘶嘶',
+          label: QUEST_LABELS.creeper.patOnFlash,
           range: 2.4,
         },
       ];
@@ -482,7 +483,7 @@ const qCreeper = {
         id: 'creeper_fuse_wait',
         pos: { x: centerPos.x, y: centerPos.y + 0.85, z: centerPos.z },
         kind: 'wait',
-        label: '等白光闪再拍',
+        label: QUEST_LABELS.creeper.waitForFlash,
         range: 2.5,
       },
     ];

@@ -2,6 +2,7 @@
 // Zero-build ES2022, deterministic simulation clock and seeded RNG only.
 
 import * as THREE from '../../vendor/three.module.min.js';
+import { RIVAL_BUBBLE } from '../data/strings.js';
 import {
   createTimers,
   surfaceY,
@@ -68,7 +69,7 @@ function getConeGeometries(coneDeg = 56, range = 4.6) {
   return { fillGeo, edgeGeo };
 }
 
-function getSpeechBubbleSprite(text = '我也要参赛!') {
+function getSpeechBubbleSprite(text = RIVAL_BUBBLE) {
   if (!cachedBubbleMat && typeof document !== 'undefined') {
     const canvas = document.createElement('canvas');
     canvas.width = 256;
@@ -86,12 +87,13 @@ function getSpeechBubbleSprite(text = '我也要参赛!') {
       g.fillRect(116, 72, 24, 16);
       g.fillStyle = '#fffdf7';
       g.fillRect(120, 66, 16, 16);
-      // Bold kid-friendly CJK text (<= 6 chars)
+      // Bold kid-friendly English bubble text fitting cleanly inside 228px inner card
+      const label = String(text || RIVAL_BUBBLE).slice(0, 20);
       g.fillStyle = '#d9342b';
-      g.font = 'bold 30px sans-serif';
+      g.font = '900 24px system-ui, sans-serif';
       g.textAlign = 'center';
       g.textBaseline = 'middle';
-      g.fillText(text.slice(0, 10), 128, 41);
+      g.fillText(label, 128, 41, 214);
     }
     const tex = new THREE.CanvasTexture(canvas);
     tex.magFilter = THREE.NearestFilter;
@@ -348,7 +350,7 @@ export function createRival(ctx) {
       actor.group.add(snowmanGroup, honeyGroup, hogPumpkinsGroup, finaleJunkGroup);
       const headNode = actor.parts?.head || actor.group;
       headNode.add(cakeFaceGroup, starsGroup);
-      speechBubble = getSpeechBubbleSprite('我也要参赛!');
+      speechBubble = getSpeechBubbleSprite(RIVAL_BUBBLE);
       if (speechBubble) {
         speechBubble.position.set(0, 3.65, 0);
         speechBubble.visible = false;

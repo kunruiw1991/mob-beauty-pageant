@@ -1,30 +1,36 @@
 // Binding roster data per docs/DESIGN.md §4 (owner: core).
+import {
+  TIER_LABELS,
+  ACCESSORY_NAMES,
+  CONTESTANT_NAMES,
+  CONTESTANT_MOBS,
+} from './strings.js';
 
 export const TIERS = Object.freeze([
-  Object.freeze({ id: 'perfect', label: '完美', name: '完美', icon: '👑', color: '#c43bd8', order: 0 }),
-  Object.freeze({ id: 'gorgeous', label: '超漂亮', name: '超漂亮', icon: '💎', color: '#3b5bdb', order: 1 }),
-  Object.freeze({ id: 'pretty', label: '漂亮', name: '漂亮', icon: '🌸', color: '#f2c318', order: 2 }),
-  Object.freeze({ id: 'okay', label: '一般', name: '一般', icon: '🙂', color: '#d9342b', order: 3 }),
-  Object.freeze({ id: 'tryhard', label: '再努力', name: '再努力', icon: '💪', color: '#3fae3a', order: 4 }),
+  Object.freeze({ id: 'perfect', label: TIER_LABELS.perfect, name: TIER_LABELS.perfect, icon: '👑', color: '#c43bd8', order: 0 }),
+  Object.freeze({ id: 'gorgeous', label: TIER_LABELS.gorgeous, name: TIER_LABELS.gorgeous, icon: '💎', color: '#3b5bdb', order: 1 }),
+  Object.freeze({ id: 'pretty', label: TIER_LABELS.pretty, name: TIER_LABELS.pretty, icon: '🌸', color: '#f2c318', order: 2 }),
+  Object.freeze({ id: 'okay', label: TIER_LABELS.okay, name: TIER_LABELS.okay, icon: '🙂', color: '#d9342b', order: 3 }),
+  Object.freeze({ id: 'tryhard', label: TIER_LABELS.tryhard, name: TIER_LABELS.tryhard, icon: '💪', color: '#3fae3a', order: 4 }),
 ]);
 
 export const ACCESSORIES = Object.freeze([
-  Object.freeze({ id: 'crown', name: '皇冠', label: '皇冠', icon: '👑', slot: 'head', color: '#ffd43b' }),
-  Object.freeze({ id: 'flowerCrown', name: '花环', label: '花环', icon: '🌸', slot: 'head', color: '#ff85c0' }),
-  Object.freeze({ id: 'bow', name: '蝴蝶结', label: '蝴蝶结', icon: '🎀', slot: 'head', color: '#ff4d6d' }),
-  Object.freeze({ id: 'strawHat', name: '草帽', label: '草帽', icon: '👒', slot: 'head', color: '#e9c46a' }),
-  Object.freeze({ id: 'topHat', name: '礼帽', label: '礼帽', icon: '🎩', slot: 'head', color: '#2b2d42' }),
-  Object.freeze({ id: 'sunglasses', name: '墨镜', label: '墨镜', icon: '😎', slot: 'face', color: '#1d1e2c' }),
-  Object.freeze({ id: 'partyHat', name: '派对帽', label: '派对帽', icon: '🎉', slot: 'head', color: '#4cc9f0' }),
-  Object.freeze({ id: 'pumpkinHat', name: '南瓜帽', label: '南瓜帽', icon: '🎃', slot: 'head', color: '#f77f00' }),
-  Object.freeze({ id: 'slimeHat', name: '史莱姆帽', label: '史莱姆帽', icon: '🟢', slot: 'head', color: '#70e000' }),
-  Object.freeze({ id: 'beanie', name: '毛线帽', label: '毛线帽', icon: '🧶', slot: 'head', color: '#ef476f' }),
-  Object.freeze({ id: 'headphones', name: '耳机', label: '耳机', icon: '🎧', slot: 'head', color: '#4361ee' }),
-  Object.freeze({ id: 'halo', name: '光环', label: '光环', icon: '✨', slot: 'head', color: '#ffe66d' }),
-  Object.freeze({ id: 'scarf', name: '围巾', label: '围巾', icon: '🧣', slot: 'neck', color: '#e63946' }),
-  Object.freeze({ id: 'beret', name: '贝雷帽', label: '贝雷帽', icon: '🎨', slot: 'head', color: '#9b5de5' }),
-  Object.freeze({ id: 'starClip', name: '星星夹', label: '星星夹', icon: '⭐', slot: 'head', color: '#ffd166' }),
-  Object.freeze({ id: 'chefHat', name: '厨师帽', label: '厨师帽', icon: '🎂', slot: 'head', color: '#ffffff' }),
+  Object.freeze({ id: 'crown', name: ACCESSORY_NAMES.crown, label: ACCESSORY_NAMES.crown, icon: '👑', slot: 'head', color: '#ffd43b' }),
+  Object.freeze({ id: 'flowerCrown', name: ACCESSORY_NAMES.flowerCrown, label: ACCESSORY_NAMES.flowerCrown, icon: '🌸', slot: 'head', color: '#ff85c0' }),
+  Object.freeze({ id: 'bow', name: ACCESSORY_NAMES.bow, label: ACCESSORY_NAMES.bow, icon: '🎀', slot: 'head', color: '#ff4d6d' }),
+  Object.freeze({ id: 'strawHat', name: ACCESSORY_NAMES.strawHat, label: ACCESSORY_NAMES.strawHat, icon: '👒', slot: 'head', color: '#e9c46a' }),
+  Object.freeze({ id: 'topHat', name: ACCESSORY_NAMES.topHat, label: ACCESSORY_NAMES.topHat, icon: '🎩', slot: 'head', color: '#2b2d42' }),
+  Object.freeze({ id: 'sunglasses', name: ACCESSORY_NAMES.sunglasses, label: ACCESSORY_NAMES.sunglasses, icon: '😎', slot: 'face', color: '#1d1e2c' }),
+  Object.freeze({ id: 'partyHat', name: ACCESSORY_NAMES.partyHat, label: ACCESSORY_NAMES.partyHat, icon: '🎉', slot: 'head', color: '#4cc9f0' }),
+  Object.freeze({ id: 'pumpkinHat', name: ACCESSORY_NAMES.pumpkinHat, label: ACCESSORY_NAMES.pumpkinHat, icon: '🎃', slot: 'head', color: '#f77f00' }),
+  Object.freeze({ id: 'slimeHat', name: ACCESSORY_NAMES.slimeHat, label: ACCESSORY_NAMES.slimeHat, icon: '🟢', slot: 'head', color: '#70e000' }),
+  Object.freeze({ id: 'beanie', name: ACCESSORY_NAMES.beanie, label: ACCESSORY_NAMES.beanie, icon: '🧶', slot: 'head', color: '#ef476f' }),
+  Object.freeze({ id: 'headphones', name: ACCESSORY_NAMES.headphones, label: ACCESSORY_NAMES.headphones, icon: '🎧', slot: 'head', color: '#4361ee' }),
+  Object.freeze({ id: 'halo', name: ACCESSORY_NAMES.halo, label: ACCESSORY_NAMES.halo, icon: '✨', slot: 'head', color: '#ffe66d' }),
+  Object.freeze({ id: 'scarf', name: ACCESSORY_NAMES.scarf, label: ACCESSORY_NAMES.scarf, icon: '🧣', slot: 'neck', color: '#e63946' }),
+  Object.freeze({ id: 'beret', name: ACCESSORY_NAMES.beret, label: ACCESSORY_NAMES.beret, icon: '🎨', slot: 'head', color: '#9b5de5' }),
+  Object.freeze({ id: 'starClip', name: ACCESSORY_NAMES.starClip, label: ACCESSORY_NAMES.starClip, icon: '⭐', slot: 'head', color: '#ffd166' }),
+  Object.freeze({ id: 'chefHat', name: ACCESSORY_NAMES.chefHat, label: ACCESSORY_NAMES.chefHat, icon: '🎂', slot: 'head', color: '#ffffff' }),
 ]);
 
 export const ACCESSORY_IDS = Object.freeze(ACCESSORIES.map((a) => a.id));
@@ -40,8 +46,8 @@ const freezeEntry = (entry) =>
 export const ROSTER = Object.freeze([
   freezeEntry({
     id: 'sheep',
-    name: '花花',
-    mob: '羊',
+    name: CONTESTANT_NAMES.sheep,
+    mob: CONTESTANT_MOBS.sheep,
     order: 1,
     hidden: false,
     accessories: ['flowerCrown', 'bow', 'strawHat'],
@@ -53,8 +59,8 @@ export const ROSTER = Object.freeze([
   }),
   freezeEntry({
     id: 'slime',
-    name: '啵啵',
-    mob: '史莱姆',
+    name: CONTESTANT_NAMES.slime,
+    mob: CONTESTANT_MOBS.slime,
     order: 2,
     hidden: false,
     accessories: ['slimeHat', 'crown', 'sunglasses'],
@@ -66,8 +72,8 @@ export const ROSTER = Object.freeze([
   }),
   freezeEntry({
     id: 'cat',
-    name: '喵喵',
-    mob: '猫',
+    name: CONTESTANT_NAMES.cat,
+    mob: CONTESTANT_MOBS.cat,
     order: 3,
     hidden: false,
     accessories: ['bow', 'beanie', 'headphones'],
@@ -79,8 +85,8 @@ export const ROSTER = Object.freeze([
   }),
   freezeEntry({
     id: 'golem',
-    name: '铁铁',
-    mob: '铁傀儡',
+    name: CONTESTANT_NAMES.golem,
+    mob: CONTESTANT_MOBS.golem,
     order: 4,
     hidden: false,
     accessories: ['flowerCrown', 'topHat', 'sunglasses'],
@@ -92,8 +98,8 @@ export const ROSTER = Object.freeze([
   }),
   freezeEntry({
     id: 'snow',
-    name: '雪宝',
-    mob: '雪傀儡',
+    name: CONTESTANT_NAMES.snow,
+    mob: CONTESTANT_MOBS.snow,
     order: 5,
     hidden: false,
     accessories: ['beanie', 'scarf', 'pumpkinHat'],
@@ -105,8 +111,8 @@ export const ROSTER = Object.freeze([
   }),
   freezeEntry({
     id: 'creeper',
-    name: '嘶嘶',
-    mob: '苦力怕',
+    name: CONTESTANT_NAMES.creeper,
+    mob: CONTESTANT_MOBS.creeper,
     order: 6,
     hidden: false,
     accessories: ['partyHat', 'bow', 'sunglasses'],
@@ -118,8 +124,8 @@ export const ROSTER = Object.freeze([
   }),
   freezeEntry({
     id: 'bee',
-    name: '嗡嗡',
-    mob: '蜜蜂',
+    name: CONTESTANT_NAMES.bee,
+    mob: CONTESTANT_MOBS.bee,
     order: 7,
     hidden: false,
     accessories: ['flowerCrown', 'crown', 'headphones'],
@@ -131,8 +137,8 @@ export const ROSTER = Object.freeze([
   }),
   freezeEntry({
     id: 'ender',
-    name: '小末',
-    mob: '末影人',
+    name: CONTESTANT_NAMES.ender,
+    mob: CONTESTANT_MOBS.ender,
     order: 8,
     hidden: false,
     accessories: ['halo', 'beret', 'sunglasses'],
@@ -144,8 +150,8 @@ export const ROSTER = Object.freeze([
   }),
   freezeEntry({
     id: 'wither',
-    name: '三三',
-    mob: '凋零',
+    name: CONTESTANT_NAMES.wither,
+    mob: CONTESTANT_MOBS.wither,
     order: 9,
     hidden: false,
     accessories: ['crown', 'partyHat', 'topHat'],
@@ -157,8 +163,8 @@ export const ROSTER = Object.freeze([
   }),
   freezeEntry({
     id: 'villager',
-    name: '翠翠',
-    mob: '村民',
+    name: CONTESTANT_NAMES.villager,
+    mob: CONTESTANT_MOBS.villager,
     order: 10,
     hidden: false,
     accessories: ['strawHat', 'crown', 'beret'],
@@ -170,8 +176,8 @@ export const ROSTER = Object.freeze([
   }),
   freezeEntry({
     id: 'dragon',
-    name: '龙宝宝',
-    mob: '末影龙',
+    name: CONTESTANT_NAMES.dragon,
+    mob: CONTESTANT_MOBS.dragon,
     order: 11,
     hidden: true,
     accessories: ['crown', 'partyHat', 'halo'],
@@ -183,8 +189,8 @@ export const ROSTER = Object.freeze([
   }),
   freezeEntry({
     id: 'pinksheep',
-    name: '粉粉',
-    mob: '粉色羊',
+    name: CONTESTANT_NAMES.pinksheep,
+    mob: CONTESTANT_MOBS.pinksheep,
     order: 12,
     hidden: true,
     accessories: ['bow', 'flowerCrown', 'starClip'],
@@ -198,8 +204,8 @@ export const ROSTER = Object.freeze([
 
 export const FINALE_RIVAL = freezeEntry({
   id: 'kai',
-  name: '小凯',
-  mob: '对手',
+  name: CONTESTANT_NAMES.kai,
+  mob: CONTESTANT_MOBS.kai,
   order: 13,
   hidden: false,
   finale: true,

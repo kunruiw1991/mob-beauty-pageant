@@ -3,6 +3,7 @@
 // 5-slot T altar + rumble/shake spawn + poppy offer, §6.4, #143, #155 G2).
 
 import * as THREE from '../../vendor/three.module.min.js';
+import { MOB_NAMES, QUEST_LABELS } from '../data/strings.js';
 import { B } from '../world/blocks.js';
 import {
   poi,
@@ -103,7 +104,7 @@ function spawnDroppedSnowPumpkin(ctx) {
     size: 0.72,
     autoPickupRadius: 0,
     range: 2.35,
-    label: '捡起南瓜头',
+    label: QUEST_LABELS.golem.pickupPumpkin,
     onCollect: () => {
       hasSnowPumpkin = true;
       playSfx(ctx, 'xp', { pos: landPos, pitch: 1.35 });
@@ -120,11 +121,11 @@ function spawnAltarSlots(ctx) {
   const az = altarBase.z;
 
   const defs = [
-    { id: 'golem_slot_base', pos: { x: ax, y: ay, z: az }, pumpkin: false, label: '铁块底座' },
-    { id: 'golem_slot_mid', pos: { x: ax, y: ay + 1, z: az }, pumpkin: false, label: '铁块身体' },
-    { id: 'golem_slot_left', pos: { x: ax - 1, y: ay + 1, z: az }, pumpkin: false, label: '左铁臂' },
-    { id: 'golem_slot_right', pos: { x: ax + 1, y: ay + 1, z: az }, pumpkin: false, label: '右铁臂' },
-    { id: 'golem_slot_head', pos: { x: ax, y: ay + 2, z: az }, pumpkin: true, label: '南瓜头' },
+    { id: 'golem_slot_base', pos: { x: ax, y: ay, z: az }, pumpkin: false, label: QUEST_LABELS.golem.ironBase },
+    { id: 'golem_slot_mid', pos: { x: ax, y: ay + 1, z: az }, pumpkin: false, label: QUEST_LABELS.golem.ironBody },
+    { id: 'golem_slot_left', pos: { x: ax - 1, y: ay + 1, z: az }, pumpkin: false, label: QUEST_LABELS.golem.ironArmLeft },
+    { id: 'golem_slot_right', pos: { x: ax + 1, y: ay + 1, z: az }, pumpkin: false, label: QUEST_LABELS.golem.ironArmRight },
+    { id: 'golem_slot_head', pos: { x: ax, y: ay + 2, z: az }, pumpkin: true, label: QUEST_LABELS.golem.pumpkinHead },
   ];
 
   altarSlots = defs.map((d) =>
@@ -187,7 +188,7 @@ function triggerGolemRumbleAndRise(ctx) {
       id: 'golem_poppy',
       targetId: 'golem_poppy',
       kind: 'entity',
-      label: '收下小红花',
+      label: QUEST_LABELS.golem.takePoppy,
       hitRadius: 1.25,
     });
   });
@@ -259,7 +260,7 @@ const qGolem = {
         color: 0x8a8a8a,
         speckColor: 0xd8af93,
         blockId: B.IRON_ORE,
-        label: '铁矿石',
+        label: QUEST_LABELS.golem.ironOre,
         range: 2.35,
         onBreak: () => {
           if (oc.clearVoxel) {
@@ -289,7 +290,7 @@ const qGolem = {
         taps: 3,
         color: 0xe6e6e6,
         blockId: B.IRON_BLOCK,
-        label: '雕像铁块',
+        label: QUEST_LABELS.golem.statueIron,
         range: 2.35,
         onBreak: () => {
           statueBorrowed += 1;
@@ -355,7 +356,7 @@ const qGolem = {
           id: `golem_pumpkin_${idx}`,
           targetId: `golem_pumpkin_${idx}`,
           kind: 'block',
-          label: '大南瓜',
+          label: QUEST_LABELS.golem.bigPumpkin,
           hitRadius: 1.15,
         })
       );
@@ -382,7 +383,7 @@ const qGolem = {
         targetId: 'golem_snowman',
         entityId: 'golem_snowman',
         kind: 'entity',
-        label: '雪傀儡',
+        label: MOB_NAMES.snowGolem,
         hitRadius: 1.2,
       });
     }
@@ -594,7 +595,7 @@ const qGolem = {
           id: 'golem_bela_wait',
           pos: { x: 70.5, y: 8.8, z: 31.8 },
           kind: 'wait',
-          label: '雕像鼻子掉啦',
+          label: QUEST_LABELS.golem.statueNoseFell,
           range: 2.5,
         },
       ];
@@ -606,7 +607,7 @@ const qGolem = {
           id: p.id,
           pos: { x: p.pos.x, y: p.pos.y + 0.5, z: p.pos.z },
           kind: 'block',
-          label: '摘南瓜',
+          label: QUEST_LABELS.golem.pickPumpkin,
           range: 2.35,
         }));
       if (rem.length > 0) return rem;
@@ -617,7 +618,7 @@ const qGolem = {
           id: 'golem_kai_wait',
           pos: { x: 75.5, y: 8.8, z: 24.5 },
           kind: 'wait',
-          label: '小凯抢南瓜',
+          label: QUEST_LABELS.golem.kaiGrabbed,
           range: 2.5,
         },
       ];
@@ -630,7 +631,7 @@ const qGolem = {
             id: 'golem_snow_hop_wait',
             pos: { x: pp.x, y: pp.y + 0.8, z: pp.z },
             kind: 'wait',
-            label: '追雪傀儡',
+            label: QUEST_LABELS.golem.chaseSnowGolem,
             range: 2.5,
           },
         ];
@@ -640,7 +641,7 @@ const qGolem = {
           id: 'golem_snowman',
           pos: { x: snowGolemPos.x, y: snowGolemPos.y + 0.9, z: snowGolemPos.z },
           kind: 'entity',
-          label: '借雪傀儡南瓜',
+          label: QUEST_LABELS.golem.borrowPumpkin,
           range: 2.35,
         },
       ];
@@ -651,7 +652,7 @@ const qGolem = {
           id: 'golem_snow_wait',
           pos: { x: snowGolemPos.x, y: snowGolemPos.y + 0.9, z: snowGolemPos.z },
           kind: 'wait',
-          label: '脸红雪傀儡',
+          label: QUEST_LABELS.golem.shySnowGolem,
           range: 2.5,
         },
       ];
@@ -670,7 +671,7 @@ const qGolem = {
           id: 'golem_poppy',
           pos: { x: altarBase.x, y: altarBase.y + 1.15, z: altarBase.z - 0.85 },
           kind: 'entity',
-          label: '收下小红花',
+          label: QUEST_LABELS.golem.takePoppy,
           range: 2.4,
         },
       ];
@@ -680,7 +681,7 @@ const qGolem = {
         id: 'golem_spawning_wait',
         pos: { x: altarBase.x, y: altarBase.y + 1.2, z: altarBase.z },
         kind: 'wait',
-        label: '铁铁诞生中',
+        label: QUEST_LABELS.golem.tinnyRising,
         range: 2.5,
       },
     ];

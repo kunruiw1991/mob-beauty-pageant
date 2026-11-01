@@ -3,6 +3,7 @@
 // and small slimes flee away from the player so you chase them across the swamp!
 
 import * as THREE from '../../vendor/three.module.min.js';
+import { CONTESTANT_NAMES, QUEST_LABELS } from '../data/strings.js';
 import {
   poi,
   surfaceY,
@@ -133,7 +134,7 @@ function spawnSlimeUnit(ctx, { size = 2, homePos, launchFrom = null, launchDur =
     targetId: id,
     entityId: id,
     kind: 'entity',
-    label: size === 2 ? '大史莱姆' : '小史莱姆',
+    label: size === 2 ? QUEST_LABELS.slime.bigSlime : QUEST_LABELS.slime.smallSlime,
     hitRadius: size === 2 ? 1.25 : 0.98,
   });
 
@@ -497,7 +498,7 @@ const qSlime = {
           id: 'slime_finishing_wait',
           pos: { x: boboPos.x, y: boboPos.y + 1.0, z: boboPos.z },
           kind: 'wait',
-          label: '啵啵',
+          label: CONTESTANT_NAMES.slime,
           range: 2.5,
         },
       ];
@@ -516,7 +517,7 @@ const qSlime = {
           id: s.id,
           pos: { x: aim.x, y: 8.55, z: aim.z },
           kind: 'entity',
-          label: s.size === 2 ? '大史莱姆' : '小史莱姆',
+          label: s.size === 2 ? QUEST_LABELS.slime.bigSlime : QUEST_LABELS.slime.smallSlime,
           range: 2.35,
         };
       });
@@ -530,7 +531,7 @@ const qSlime = {
         id: 'slime_bounce_wait',
         pos: { x: waitPos.x, y: 8.55, z: waitPos.z },
         kind: 'wait',
-        label: '追上史莱姆',
+        label: QUEST_LABELS.slime.chaseSlime,
         range: 2.5,
       },
     ];

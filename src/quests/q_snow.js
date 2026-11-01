@@ -2,6 +2,7 @@
 // Zero-build ES2022, deterministic sim time/rng only.
 
 import * as THREE from '../../vendor/three.module.min.js';
+import { QUEST_LABELS } from '../data/strings.js';
 import {
   poi,
   surfaceY,
@@ -334,7 +335,7 @@ const qSnow = {
         id: `snow_bank_${b.index}`,
         targetId: `snow_bank_${b.index}`,
         kind: 'block',
-        label: '搓雪球',
+        label: QUEST_LABELS.snow.packSnowball,
         hitRadius: 1.15,
       });
     }
@@ -377,7 +378,7 @@ const qSnow = {
         targetId: 'snow_throw_lane',
         entityId: 'kai',
         kind: 'entity',
-        label: '砸小凯',
+        label: QUEST_LABELS.snow.peltKai,
         hitRadius: 1.35,
       });
     }
@@ -385,7 +386,7 @@ const qSnow = {
       id: 'snow_enemy_ball',
       targetId: 'snow_enemy_ball',
       kind: 'entity',
-      label: '拍雪球',
+      label: QUEST_LABELS.snow.swatSnowball,
       hitRadius: 1.15,
     });
   },
@@ -543,12 +544,12 @@ const qSnow = {
     const pPos = playerPos(ctx);
     if (completing) {
       const lp = currentLanePos();
-      return [{ id: 'snow_done_wait', pos: { x: lp.x, y: 8, z: 13.5 }, kind: 'wait', label: '雪人小凯', range: 2.3 }];
+      return [{ id: 'snow_done_wait', pos: { x: lp.x, y: 8, z: 13.5 }, kind: 'wait', label: QUEST_LABELS.snow.snowmanKai, range: 2.3 }];
     }
 
     // Walk into snow arena first if player activated quest from far away
     if (distXZ(pPos, center) > 10.5) {
-      return [{ id: 'snow_enter', pos: standPos, kind: 'block', label: '雪球场', range: 2.3 }];
+      return [{ id: 'snow_enter', pos: standPos, kind: 'block', label: QUEST_LABELS.snow.snowArena, range: 2.3 }];
     }
 
     // Swat incoming snowball if it is right within melee reach of player
@@ -558,7 +559,7 @@ const qSnow = {
           id: 'snow_enemy_ball',
           pos: { x: enemyBallMesh.position.x, y: 8, z: enemyBallMesh.position.z },
           kind: 'entity',
-          label: '拍雪球',
+          label: QUEST_LABELS.snow.swatSnowball,
           range: 2.3,
         },
       ];
@@ -572,7 +573,7 @@ const qSnow = {
           id: `snow_bank_${b.index}`,
           pos: { x: b.x, y: 8, z: b.z },
           kind: 'block',
-          label: '搓雪球',
+          label: QUEST_LABELS.snow.packSnowball,
           range: 2.2,
         },
       ];
@@ -586,7 +587,7 @@ const qSnow = {
           id: 'snow_throw_lane',
           pos: throwSpot,
           kind: 'entity',
-          label: '砸小凯',
+          label: QUEST_LABELS.snow.peltKai,
           range: 2.3,
         },
       ];
@@ -598,7 +599,7 @@ const qSnow = {
         id: 'snow_ready_wait',
         pos: { x: 50.0, y: 8, z: 14.2 },
         kind: 'wait',
-        label: '等小凯露头',
+        label: QUEST_LABELS.snow.waitKaiPeek,
         range: 2.4,
       },
     ];

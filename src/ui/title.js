@@ -2,6 +2,7 @@
 // Adopts existing `#title` if present (iPad module-failure safety §1).
 // Blocky pixel-style logo `我的世界：生物选美大赛`, ▶ >= 110px, 继续 when progress, 🏆.
 
+import { GAME_TITLE, SUB_BANNER, UI } from '../data/strings.js';
 import { bindTap, getVoxelTextures } from './ui_kit.js';
 import { progress } from './progress.js';
 
@@ -30,12 +31,12 @@ export function createTitleUI(ctx = {}, hooks = {}) {
   logoWrap.innerHTML = `
     <div class="title-sub-banner" style="background-image: ${tex.stoneBrick};">
       <span class="title-sub-icon">⛏️</span>
-      <span class="title-sub-text">我的世界</span>
+      <span class="title-sub-text">${SUB_BANNER}</span>
       <span class="title-sub-icon">👑</span>
     </div>
     <div class="title-main-banner">
       <span class="title-deco title-deco-l">🌸</span>
-      <h1 class="title-main-text">生物选美大赛</h1>
+      <h1 class="title-main-text">${GAME_TITLE}</h1>
       <span class="title-deco title-deco-r">💎</span>
     </div>
   `;
@@ -50,20 +51,20 @@ export function createTitleUI(ctx = {}, hooks = {}) {
   btnContinue.type = 'button';
   btnContinue.id = 'btn-title-continue';
   btnContinue.className = 'mc-btn mc-btn-blue title-continue-btn';
-  btnContinue.innerHTML = `<span class="btn-icon">📂</span><span class="btn-label">继续</span>`;
+  btnContinue.innerHTML = `<span class="btn-icon">📂</span><span class="btn-label">${UI.continueBtn}</span>`;
 
   const btnPlay = document.createElement('button');
   btnPlay.type = 'button';
   btnPlay.id = 'btn-title-play';
   btnPlay.className = 'mc-btn mc-btn-green title-play-btn';
-  btnPlay.setAttribute('aria-label', '开始');
+  btnPlay.setAttribute('aria-label', UI.playAria);
   btnPlay.innerHTML = `<span class="play-triangle">▶</span>`;
 
   const btnBoard = document.createElement('button');
   btnBoard.type = 'button';
   btnBoard.id = 'btn-title-board';
   btnBoard.className = 'mc-btn mc-btn-gold title-trophy-btn';
-  btnBoard.setAttribute('aria-label', '排行榜');
+  btnBoard.setAttribute('aria-label', UI.boardAria);
   btnBoard.innerHTML = `<span class="btn-icon-lg">🏆</span>`;
 
   actionsDock.append(btnContinue, btnPlay, btnBoard);

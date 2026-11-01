@@ -11,9 +11,15 @@ export function createAudio(ctx) {
   let compressor = null;
   let sfxBus = null;
   let musicBus = null;
+  let voiceBus = null;
   let mutedMusic = false;
   let mutedSfx = false;
+  let musicDucked = false;
   let unlocked = false;
+
+  // v1.1: BGM ducks -6 dB (x0.5) while a voice-over line plays (src/fx/voice.js).
+  const MUSIC_GAIN = 0.42;
+  const musicTarget = () => (mutedMusic ? 0 : musicDucked ? MUSIC_GAIN * 0.5 : MUSIC_GAIN);
 
   function ensureStats() {
     const s = ctx?.state;
@@ -45,8 +51,13 @@ export function createAudio(ctx) {
       sfxBus.connect(compressor);
 
       musicBus = audioCtx.createGain();
-      musicBus.gain.value = mutedMusic ? 0 : 0.42;
+      musicBus.gain.value = musicTarget();
       musicBus.connect(compressor);
+
+      // Voice-over bus (decoded clips from assets/voice/, one line at a time)
+      voiceBus = audioCtx.createGain();
+      voiceBus.gain.value = 1.0;
+      voiceBus.connect(compressor);
     } catch (_) {
       audioCtx = null;
     }
@@ -71,9 +82,10 @@ export function createAudio(ctx) {
     return unlocked;
   }
 
-  // Bind first pointerdown / keydown unlock automatically per §3.8 & §9
+  // Bind first pointerdown / keydown unlock automatically per §3.8 & §9 (auto-repeat keydowns ignored)
   if (typeof window !== 'undefined') {
-    const onFirstGesture = () => {
+    const onFirstGesture = (ev) => {
+      if (ev && ev.repeat) return;
       unlock();
       if (audioCtx && audioCtx.state === 'running') {
         window.removeEventListener('pointerdown', onFirstGesture, true);
@@ -114,7 +126,7 @@ export function createAudio(ctx) {
       sfxBus.gain.setTargetAtTime(mutedSfx ? 0 : 0.85, audioCtx.currentTime, 0.015);
     }
     if (musicBus && audioCtx) {
-      musicBus.gain.setTargetAtTime(mutedMusic ? 0 : 0.42, audioCtx.currentTime, 0.03);
+      musicBus.gain.setTargetAtTime(musicTarget(), audioCtx.currentTime, 0.03);
     }
     if (mutedSfx) sfxEngine.stopAll();
     return { music: mutedMusic, sfx: mutedSfx };
@@ -122,6 +134,15 @@ export function createAudio(ctx) {
 
   function getMuted() {
     return { music: mutedMusic, sfx: mutedSfx };
+  }
+
+  // v1.1 voice-over hooks: shared context + voice bus, and BGM ducking while a line plays.
+  function duckMusic(on) {
+    musicDucked = Boolean(on);
+    if (musicBus && audioCtx) {
+      musicBus.gain.setTargetAtTime(musicTarget(), audioCtx.currentTime, musicDucked ? 0.05 : 0.3);
+    }
+    return musicDucked;
   }
 
   function areaTrack(area) {
@@ -159,6 +180,11 @@ export function createAudio(ctx) {
     music,
     setMuted,
     getMuted,
+    duckMusic,
+    isMusicDucked: () => musicDucked,
+    getContext: () => audioCtx,
+    getVoiceBus: () => voiceBus,
+    isUnlocked: () => Boolean(audioCtx && audioCtx.state === 'running'),
     sfxNames: SFX_NAMES,
     musicTracks: MUSIC_TRACKS,
     currentTrack: () => musicEngine.currentTrack(),

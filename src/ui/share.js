@@ -6,6 +6,7 @@
 // - 继续找 (return to world to hunt hidden contestants)
 
 import { TIERS, FINALE_RIVAL, getContestantMeta } from '../data/roster.js';
+import { GAME_TITLE, UI } from '../data/strings.js';
 import { bindTap, computeStars, drawContestantChibi2D, formatDurationMs, getVoxelTextures } from './ui_kit.js';
 import { renderPortrait } from './portrait.js';
 import { progress } from './progress.js';
@@ -59,7 +60,7 @@ export function createShareUI(ctx = {}, hooks = {}) {
   headerCard.className = 'final-header-card';
   const titleEl = document.createElement('div');
   titleEl.className = 'final-title';
-  titleEl.textContent = '🏆 最终排行榜';
+  titleEl.textContent = UI.finalTitle;
 
   const starsEl = document.createElement('div');
   starsEl.id = 'final-stars';
@@ -78,19 +79,19 @@ export function createShareUI(ctx = {}, hooks = {}) {
   btnShare.type = 'button';
   btnShare.id = 'btn-final-share';
   btnShare.className = 'mc-btn mc-btn-gold final-action-btn';
-  btnShare.innerHTML = `<span class="btn-icon">📤</span><span>分享</span>`;
+  btnShare.innerHTML = `<span class="btn-icon">📤</span><span>${UI.share}</span>`;
 
   const btnReplay = document.createElement('button');
   btnReplay.type = 'button';
   btnReplay.id = 'btn-final-replay';
   btnReplay.className = 'mc-btn mc-btn-green final-action-btn';
-  btnReplay.innerHTML = `<span class="btn-icon">🔄</span><span>再来一次</span>`;
+  btnReplay.innerHTML = `<span class="btn-icon">🔄</span><span>${UI.replay}</span>`;
 
   const btnHunt = document.createElement('button');
   btnHunt.type = 'button';
   btnHunt.id = 'btn-final-hunt';
   btnHunt.className = 'mc-btn mc-btn-blue final-action-btn';
-  btnHunt.innerHTML = `<span class="btn-icon">🔍</span><span>继续找</span>`;
+  btnHunt.innerHTML = `<span class="btn-icon">🔍</span><span>${UI.continueHunt}</span>`;
 
   actionsCol.append(btnShare, btnReplay, btnHunt);
   summaryPanel.append(headerCard, actionsCol);
@@ -99,7 +100,7 @@ export function createShareUI(ctx = {}, hooks = {}) {
   const toastEl = document.createElement('div');
   toastEl.className = 'final-toast-fx ui-hidden';
   toastEl.hidden = true;
-  toastEl.textContent = '✅ 已保存图片';
+  toastEl.textContent = UI.toastSaved;
 
   shell.append(wallBox, summaryPanel);
   overlay.append(backdrop, shell, toastEl);
@@ -251,8 +252,8 @@ export function createShareUI(ctx = {}, hooks = {}) {
     g.fillStyle = '#1f2029';
     g.fillRect(36, 24, W - 72, 92);
     g.fillStyle = '#ffd43b';
-    g.font = '900 42px "PingFang SC", "Microsoft YaHei", sans-serif';
-    g.fillText('我的世界：生物选美大赛', 60, 84);
+    g.font = '900 40px system-ui, sans-serif';
+    g.fillText(GAME_TITLE, 60, 84, 650);
 
     const stars = computeStars(ctx.state || progress.load() || {});
     const ms = ctx.state?.elapsedMs ?? ctx.state?.timeMs ?? 0;
@@ -308,8 +309,8 @@ export function createShareUI(ctx = {}, hooks = {}) {
       g.fillStyle = 'rgba(0,0,0,0.28)';
       g.fillRect(48, ry, 210, rowH);
       g.fillStyle = '#ffffff';
-      g.font = '900 32px "PingFang SC", "Microsoft YaHei", sans-serif';
-      g.fillText(`${tier.icon} ${tier.label}`, 66, ry + 70);
+      g.font = '900 22px system-ui, sans-serif';
+      g.fillText(`${tier.icon} ${tier.label}`, 60, ry + 68, 188);
 
       // Contestant portraits in this row (>= 96 px when space allows)
       const idsInRow = Object.entries(board)
@@ -338,16 +339,16 @@ export function createShareUI(ctx = {}, hooks = {}) {
           g.drawImage(tmp, cx + 5, ry + 10, cardW - 10, 74);
         }
         g.fillStyle = '#1e1e24';
-        g.font = 'bold 15px "PingFang SC", sans-serif';
+        g.font = 'bold 14px system-ui, sans-serif';
         g.textAlign = 'center';
-        g.fillText(meta?.name || cid, cx + cardW / 2, ry + 104);
+        g.fillText(meta?.name || cid, cx + cardW / 2, ry + 104, cardW - 6);
         g.textAlign = 'start';
       }
     }
     return canvas;
   }
 
-  function showToast(msg = '✅ 已保存图片') {
+  function showToast(msg = UI.toastSaved) {
     toastEl.textContent = msg;
     toastEl.hidden = false;
     toastEl.classList.remove('ui-hidden');
@@ -380,9 +381,9 @@ export function createShareUI(ctx = {}, hooks = {}) {
         if (navigator.canShare({ files: [file] })) {
           await navigator.share({
             files: [file],
-            title: '我的世界：生物选美大赛',
+            title: GAME_TITLE,
           });
-          showToast('✅ 已分享');
+          showToast(UI.toastShared);
           return true;
         }
       } catch (_) {
@@ -399,7 +400,7 @@ export function createShareUI(ctx = {}, hooks = {}) {
     link.click();
     document.body.removeChild(link);
     setTimeout(() => URL.revokeObjectURL(objUrl), 3000);
-    showToast('✅ 已保存图片');
+    showToast(UI.toastSaved);
     return true;
   }
 

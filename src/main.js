@@ -26,6 +26,7 @@ import { createChars } from './chars/models.js';
 import { createUI } from './ui/hud.js';
 import { createFx } from './fx/particles.js';
 import { createAudio } from './fx/audio.js';
+import { createVoice } from './fx/voice.js';
 import { createQuestManager } from './quests/index.js';
 import { createRival } from './quests/rival.js';
 import { startFinale } from './quests/finale.js';
@@ -1520,6 +1521,7 @@ async function boot() {
     ctx.ui?.showHUD?.(true);
     ctx.ui?.updateHUD?.(snapshotState(state));
     ctx.audio?.music?.('overworld');
+    ctx.voice?.onGameStart?.({ resume: Boolean(resume && ctx.ui?.progress?.hasProgress?.()) });
     events.emit('sceneChange', { scene: 'world' });
 
     if (!skipIntro) {
@@ -1614,6 +1616,9 @@ async function boot() {
   // Instantiate UI after ctx hooks exist
   ctx.ui = createUI(ctx);
 
+  // v1.1 voice-over (pre-recorded clips + subtitles); on/off persisted in pageant_progress.voiceOff
+  ctx.voice = createVoice(ctx, { enabled: !ctx.ui?.progress?.getVoiceOff?.() });
+
   // Restore saved progress into state on reload so F14 holds immediately + via 继续
   if (!debugParams.hasSeed && ctx.ui?.progress?.hasProgress?.()) {
     restoreProgressIntoState(ctx.ui.progress.load());
@@ -1657,10 +1662,62 @@ async function boot() {
   // Create Input & Fixed-Step Loop
   createInput(ctx);
 
+  // v1.1 render interpolation: the sim (player + follow camera) steps at a fixed 60 Hz, but rAF may run at
+  // 120 Hz (iPad ProMotion) or unevenly; draw the player and camera at the interpolated sub-step pose so the
+  // faster walk stays judder-free. The sim pose is restored right after the draw (sims/determinism untouched).
+  const interp = {
+    ready: false,
+    prevPlayer: new THREE.Vector3(),
+    prevCam: new THREE.Vector3(),
+    prevQuat: new THREE.Quaternion(),
+    curPlayer: new THREE.Vector3(),
+    curCam: new THREE.Vector3(),
+    curQuat: new THREE.Quaternion(),
+  };
+  function capturePrevPose() {
+    const pg = ctx.player?.group;
+    if (!pg || state.scene !== 'world') {
+      interp.ready = false;
+      return;
+    }
+    interp.prevPlayer.copy(pg.position);
+    interp.prevCam.copy(ctx.camera.position);
+    interp.prevQuat.copy(ctx.camera.quaternion);
+    interp.ready = true;
+  }
+  function applyInterpolatedPose(alpha) {
+    const pg = ctx.player?.group;
+    if (!interp.ready || !pg || state.scene !== 'world' || ctx.loop?.isPaused?.()) return false;
+    if (!(alpha > 0.001 && alpha < 0.999)) return false;
+    interp.curPlayer.copy(pg.position);
+    interp.curCam.copy(ctx.camera.position);
+    interp.curQuat.copy(ctx.camera.quaternion);
+    // Never smear across teleports, portal hops or camera cuts.
+    if (
+      interp.prevPlayer.distanceToSquared(interp.curPlayer) > 4 ||
+      interp.prevCam.distanceToSquared(interp.curCam) > 9
+    ) {
+      return false;
+    }
+    pg.position.lerpVectors(interp.prevPlayer, interp.curPlayer, alpha);
+    ctx.camera.position.lerpVectors(interp.prevCam, interp.curCam, alpha);
+    ctx.camera.quaternion.slerpQuaternions(interp.prevQuat, interp.curQuat, alpha);
+    ctx.camera.updateMatrixWorld();
+    return true;
+  }
+  function restoreSimPose() {
+    const pg = ctx.player?.group;
+    if (pg) pg.position.copy(interp.curPlayer);
+    ctx.camera.position.copy(interp.curCam);
+    ctx.camera.quaternion.copy(interp.curQuat);
+    ctx.camera.updateMatrixWorld();
+  }
+
   ctx.loop = createLoop({
     ctx,
     onSlice: drainBuildSlice,
     onStep(dt) {
+      capturePrevPose();
       if (state.scene === 'world') {
         ctx.areas.update(dt);
         ctx.rival?.update?.(dt);
@@ -1724,9 +1781,11 @@ async function boot() {
 
       syncCutawayUniforms();
     },
-    onRender() {
+    onRender(alpha) {
+      const interpolated = applyInterpolatedPose(alpha);
       syncCutawayUniforms();
       ctx.renderer.render(ctx.scene, ctx.camera);
+      if (interpolated) restoreSimPose();
     },
   });
 

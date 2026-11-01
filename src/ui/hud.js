@@ -7,6 +7,7 @@
 // - Off-screen beacon edge arrow (`#hud-beacon-btn` >= 72 px) with next contestant's face; hides when on-screen
 
 import { ROSTER, ROSTER_BY_ID, getContestantMeta } from '../data/roster.js';
+import { UI } from '../data/strings.js';
 import { bindTap, clampCjk, drawContestantChibi2D, getVoxelTextures } from './ui_kit.js';
 import { progress } from './progress.js';
 import { renderPortrait } from './portrait.js';
@@ -35,7 +36,7 @@ export function createHudUI(ctx = {}, hooks = {}) {
   boardBtn.type = 'button';
   boardBtn.id = 'hud-board-btn';
   boardBtn.className = 'mc-btn hud-board-chip';
-  boardBtn.setAttribute('aria-label', '排行榜');
+  boardBtn.setAttribute('aria-label', UI.boardAria);
   boardBtn.innerHTML = `
     <span class="hud-mini-wall" aria-hidden="true">
       <i style="background:#c43bd8"></i>
@@ -48,7 +49,7 @@ export function createHudUI(ctx = {}, hooks = {}) {
   `;
   const countSpan = boardBtn.querySelector('#hud-board-count');
 
-  // 2. Top-centre NON-INTERACTIVE objective strip (<= 12 CJK chars, icons over words)
+  // 2. Top-centre NON-INTERACTIVE objective strip (icons over words; v1.1 English <= 24 chars)
   const objStrip = document.createElement('div');
   objStrip.id = 'hud-objective';
   objStrip.className = 'hud-objective-strip ui-hidden';
@@ -65,7 +66,7 @@ export function createHudUI(ctx = {}, hooks = {}) {
   pauseBtn.type = 'button';
   pauseBtn.id = 'hud-pause-btn';
   pauseBtn.className = 'mc-btn hud-pause-btn';
-  pauseBtn.setAttribute('aria-label', '暂停');
+  pauseBtn.setAttribute('aria-label', UI.pauseAria);
   pauseBtn.innerHTML = `<span class="hud-pause-glyph">⏸</span>`;
 
   // 4. Bottom-right context action button (visible ONLY when action != null)
@@ -87,7 +88,7 @@ export function createHudUI(ctx = {}, hooks = {}) {
   beaconBtn.id = 'hud-beacon-btn';
   beaconBtn.className = 'mc-btn hud-beacon-btn ui-hidden';
   beaconBtn.hidden = true;
-  beaconBtn.setAttribute('aria-label', '前往目标');
+  beaconBtn.setAttribute('aria-label', UI.beaconAria);
 
   const beaconInner = document.createElement('span');
   beaconInner.className = 'hud-beacon-inner';

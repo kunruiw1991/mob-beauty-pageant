@@ -2,6 +2,7 @@
 // Zero-build ES2022, deterministic sim time/rng only (no Math.random, Date.now, setTimeout).
 
 import * as THREE from '../../vendor/three.module.min.js';
+import { QUEST_LABELS } from '../data/strings.js';
 
 // Fallback POI table matching docs/DESIGN.md §5 in case world is stubbed or still building.
 export const DEFAULT_POI = Object.freeze({
@@ -521,7 +522,7 @@ export function createBreakable(ctx, opts = {}) {
   const sy = opts.height ?? size;
   const color = opts.color ?? 0xb87333;
   const blockId = opts.blockId ?? 1;
-  const label = opts.label || '方块';
+  const label = opts.label || QUEST_LABELS.kit.block;
 
   const group = new THREE.Group();
   group.position.set(pos.x, pos.y + sy * 0.5, pos.z);
@@ -665,7 +666,7 @@ export function createCollectible(ctx, opts = {}) {
   const ttl = opts.ttl ?? 0;
   const sparkleTtl = opts.sparkleTtl ?? 0;
   const item = opts.item || 'item';
-  let curLabel = opts.label || '物品';
+  let curLabel = opts.label || QUEST_LABELS.kit.item;
 
   const group = new THREE.Group();
   group.position.set(pos.x, pos.y + 0.45, pos.z);
@@ -718,7 +719,7 @@ export function createCollectible(ctx, opts = {}) {
     if (!isSparkly) return;
     isSparkly = false;
     curAutoPickup = 0;
-    curLabel = opts.fadedLabel || '小花';
+    curLabel = opts.fadedLabel || QUEST_LABELS.kit.flower;
     if (haloMesh) haloMesh.visible = false;
     group.visible = true;
     if (petalsMesh) petalsMesh.scale.set(0.7, 0.7, 0.7);
@@ -833,7 +834,7 @@ export function createGhostSlot(ctx, opts = {}) {
   const ghostColor = opts.ghostColor ?? 0x74c0fc;
   const placedColor = opts.placedColor ?? 0xdcdcdc;
   const blockId = opts.blockId ?? 1;
-  const label = opts.label || '放置';
+  const label = opts.label || QUEST_LABELS.kit.place;
 
   const group = new THREE.Group();
   group.position.set(pos.x, pos.y + size * 0.5, pos.z);

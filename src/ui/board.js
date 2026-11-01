@@ -9,17 +9,12 @@
 // - 2.5 s per-row crowd + contestant + confetti/fireworks reactions (§8.3)
 
 import { TIERS, TIERS_BY_ID, ROSTER, FINALE_RIVAL, getContestantMeta } from '../data/roster.js';
+import { MYSTERY_HINTS, REACTION_CAPTIONS, UI } from '../data/strings.js';
 import { bindTap, computeStars, drawContestantChibi2D, getVoxelTextures, MOB_ICONS } from './ui_kit.js';
 import { renderPortrait } from './portrait.js';
 import { progress } from './progress.js';
 
-const REACTION_TEXT = Object.freeze({
-  perfect: '👑 完美！全场沸腾！',
-  gorgeous: '💎 超漂亮！太闪啦！',
-  pretty: '🌸 漂亮！好可爱！',
-  okay: '🙂 一般～开心跳舞！',
-  tryhard: '💪 再努力！加油！',
-});
+const REACTION_TEXT = Object.freeze(REACTION_CAPTIONS);
 
 const HIDDEN_IDS = Object.freeze(['dragon', 'pinksheep']);
 
@@ -393,8 +388,8 @@ export function createBoardUI(ctx = {}, hooks = {}) {
   closeBtn.type = 'button';
   closeBtn.id = 'board-close-btn';
   closeBtn.className = 'mc-btn mc-btn-green board-close-btn';
-  closeBtn.setAttribute('aria-label', '返回');
-  closeBtn.innerHTML = `<span class="btn-icon">✔</span><span>完成</span>`;
+  closeBtn.setAttribute('aria-label', UI.back);
+  closeBtn.innerHTML = `<span class="btn-icon">✔</span><span>${UI.done}</span>`;
 
   const trayBox = document.createElement('div');
   trayBox.id = 'board-tray';
@@ -424,7 +419,7 @@ export function createBoardUI(ctx = {}, hooks = {}) {
     mBtn.id = `mystery-slot-${hid}`;
     mBtn.className = 'mc-btn board-mystery-btn';
     mBtn.dataset.mysteryId = hid;
-    mBtn.setAttribute('aria-label', '神秘选手提示');
+    mBtn.setAttribute('aria-label', UI.secretHintTitle);
     mBtn.style.backgroundImage = tex.quartz;
 
     const thumbCanvas = document.createElement('canvas');
@@ -475,7 +470,7 @@ export function createBoardUI(ctx = {}, hooks = {}) {
   hintCloseBtn.type = 'button';
   hintCloseBtn.id = 'board-hint-close-btn';
   hintCloseBtn.className = 'mc-btn mc-btn-green board-hint-close-btn';
-  hintCloseBtn.innerHTML = `<span class="btn-icon">✔</span><span>知道啦</span>`;
+  hintCloseBtn.innerHTML = `<span class="btn-icon">✔</span><span>${UI.gotIt}</span>`;
 
   hintMatting.append(hintCanvas, hintCaption, hintCloseBtn);
   hintCard.appendChild(hintMatting);
@@ -530,7 +525,7 @@ export function createBoardUI(ctx = {}, hooks = {}) {
     drawMysteryHintCanvas(hintCanvas, hiddenId);
     hintModal.dataset.mysteryId = hiddenId;
     hintCaption.textContent =
-      hiddenId === 'dragon' ? '🌀 末地门 ➡️ 🥚 龙蛋' : '🌷 郁金香 ➡️ 🐑 小羊';
+      hiddenId === 'dragon' ? MYSTERY_HINTS.dragon : MYSTERY_HINTS.pinksheep;
     hintCloseBtn._resetTapDebounce?.();
     hideGhostHand();
     shell.classList.add('ui-hidden');

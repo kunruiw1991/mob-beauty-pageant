@@ -1,4 +1,5 @@
 import { fillNoiseRect } from './skins.js';
+import { MOB_NAMES } from '../data/strings.js';
 
 function px(g, x, y, w, h, col) {
   g.fillStyle = col;
@@ -12,7 +13,7 @@ function px(g, x, y, w, h, col) {
  */
 export const MOB_SPECS = {
   slimeMob: {
-    name: '史莱姆',
+    name: MOB_NAMES.slime,
     mobRigType: 'slime',
     headS: 0.56,
     bodyW: 0.01,
@@ -33,7 +34,7 @@ export const MOB_SPECS = {
   },
 
   snowGolemMob: {
-    name: '雪傀儡',
+    name: MOB_NAMES.snowGolem,
     headS: 0.68,
     bodyW: 0.72,
     bodyH: 0.66,
@@ -65,7 +66,7 @@ export const MOB_SPECS = {
   },
 
   villagerMob: {
-    name: '村民',
+    name: MOB_NAMES.villager,
     headS: 0.86,
     bodyW: 0.74,
     bodyH: 0.88,
@@ -95,7 +96,7 @@ export const MOB_SPECS = {
   },
 
   witherSkeleton: {
-    name: '凋零骷髅',
+    name: MOB_NAMES.witherSkeleton,
     headS: 0.82,
     bodyW: 0.62,
     bodyH: 0.88,
@@ -125,7 +126,7 @@ export const MOB_SPECS = {
   },
 
   endermanMob: {
-    name: '末影人',
+    name: MOB_NAMES.enderman,
     headS: 0.78,
     bodyW: 0.56,
     bodyH: 0.84,
@@ -151,7 +152,7 @@ export const MOB_SPECS = {
   },
 
   sheepMob: {
-    name: '小羊',
+    name: MOB_NAMES.sheep,
     mobRigType: 'quadruped',
     quadDims: { bodyW: 0.82, bodyH: 0.64, bodyD: 1.08, legH: 0.44, legW: 0.22, headS: 0.60, headZ: 0.56, headY: 0.76 },
     hairColor: '#ffffff',
@@ -175,7 +176,7 @@ export const MOB_SPECS = {
   },
 
   chicken: {
-    name: '小鸡',
+    name: MOB_NAMES.chicken,
     mobRigType: 'chicken',
     headS: 0.40,
     bodyW: 0.48,
@@ -200,7 +201,7 @@ export const MOB_SPECS = {
   },
 
   catMob: {
-    name: '小猫',
+    name: MOB_NAMES.cat,
     mobRigType: 'quadruped',
     quadDims: { bodyW: 0.42, bodyH: 0.36, bodyD: 0.86, legH: 0.30, legW: 0.15, headS: 0.46, headZ: 0.46, headY: 0.50 },
     hairColor: '#2b2d38',
@@ -229,7 +230,7 @@ export const MOB_SPECS = {
   },
 
   beeMob: {
-    name: '小蜜蜂',
+    name: MOB_NAMES.bee,
     mobRigType: 'bee',
     baseLift: 0.52,
     headS: 0.01,
@@ -270,7 +271,7 @@ export const MOB_SPECS = {
   },
 
   crowdMob: {
-    name: '观众',
+    name: MOB_NAMES.crowd,
     hairColor: '#495057',
     bodyColor: '#4dabf7',
     sleeveColor: '#74c0fc',

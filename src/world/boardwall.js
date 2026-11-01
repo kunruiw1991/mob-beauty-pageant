@@ -1,12 +1,13 @@
 import * as THREE from '../../vendor/three.module.min.js';
+import { TIER_LABELS } from '../data/strings.js';
 
 // Matches §4 TIERS top->bottom:
 const WALL_ROWS = [
-  { id: 'perfect', label: '完美', sub: 'PERFECT', icon: '👑', color: '#c43bd8', dark: '#8d229e' },
-  { id: 'gorgeous', label: '超漂亮', sub: 'GORGEOUS', icon: '💎', color: '#3b5bdb', dark: '#243da8' },
-  { id: 'pretty', label: '漂亮', sub: 'PRETTY', icon: '🌸', color: '#f2c318', dark: '#bd920b' },
-  { id: 'okay', label: '一般', sub: 'CUTE', icon: '🙂', color: '#d9342b', dark: '#9e1e17' },
-  { id: 'tryhard', label: '再努力', sub: 'GO!', icon: '💪', color: '#3fae3a', dark: '#287d24' },
+  { id: 'perfect', label: TIER_LABELS.perfect, fontPx: 18, icon: '👑', color: '#c43bd8', dark: '#8d229e' },
+  { id: 'gorgeous', label: TIER_LABELS.gorgeous, fontPx: 16, icon: '💎', color: '#3b5bdb', dark: '#243da8' },
+  { id: 'pretty', label: TIER_LABELS.pretty, fontPx: 20, icon: '🌸', color: '#f2c318', dark: '#bd920b' },
+  { id: 'okay', label: TIER_LABELS.okay, fontPx: 23, icon: '🙂', color: '#d9342b', dark: '#9e1e17' },
+  { id: 'tryhard', label: TIER_LABELS.tryhard, lines: ['KEEP', 'TRYING'], fontPx: 18, icon: '💪', color: '#3fae3a', dark: '#287d24' },
 ];
 
 export function createBoardWall(ctx) {
@@ -68,15 +69,29 @@ export function createBoardWall(ctx) {
 
       g.textAlign = 'center';
       g.textBaseline = 'middle';
-      g.font = 'bold 28px monospace, sans-serif';
-      g.fillStyle = '#ffffff';
-      g.fillText(row.icon, LABEL_W / 2, y0 + 42);
+      if (row.lines) {
+        g.font = 'bold 26px monospace, sans-serif';
+        g.fillStyle = '#ffffff';
+        g.fillText(row.icon, LABEL_W / 2, y0 + 34);
 
-      g.font = 'bold 24px "Noto Sans SC", "PingFang SC", sans-serif';
-      g.fillStyle = '#141414';
-      g.fillText(row.label, LABEL_W / 2 + 2, y0 + 84);
-      g.fillStyle = '#ffffff';
-      g.fillText(row.label, LABEL_W / 2, y0 + 82);
+        g.font = `900 ${row.fontPx}px system-ui, sans-serif`;
+        g.fillStyle = '#141414';
+        g.fillText(row.lines[0], LABEL_W / 2 + 2, y0 + 71, 96);
+        g.fillText(row.lines[1], LABEL_W / 2 + 2, y0 + 93, 96);
+        g.fillStyle = '#ffffff';
+        g.fillText(row.lines[0], LABEL_W / 2, y0 + 69, 96);
+        g.fillText(row.lines[1], LABEL_W / 2, y0 + 91, 96);
+      } else {
+        g.font = 'bold 28px monospace, sans-serif';
+        g.fillStyle = '#ffffff';
+        g.fillText(row.icon, LABEL_W / 2, y0 + 42);
+
+        g.font = `900 ${row.fontPx}px system-ui, sans-serif`;
+        g.fillStyle = '#141414';
+        g.fillText(row.label, LABEL_W / 2 + 2, y0 + 84, 96);
+        g.fillStyle = '#ffffff';
+        g.fillText(row.label, LABEL_W / 2, y0 + 82, 96);
+      }
 
       // Highlight glow frame if active
       if (highlightedTier === row.id) {

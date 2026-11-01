@@ -1,4 +1,5 @@
 import { fillNoiseRect } from './skins.js';
+import { NPC_NAMES } from '../data/strings.js';
 
 function px(g, x, y, w, h, col) {
   g.fillStyle = col;
@@ -14,7 +15,7 @@ function px(g, x, y, w, h, col) {
  */
 export const NPC_SPECS = {
   player: {
-    name: '阿辰',
+    name: NPC_NAMES.player,
     hairColor: '#57e32c',
     bodyColor: '#57e32c',
     sleeveColor: '#57e32c',
@@ -50,7 +51,7 @@ export const NPC_SPECS = {
   },
 
   kai: {
-    name: '小凯',
+    name: NPC_NAMES.kai,
     hairColor: '#261c1a',
     bodyColor: '#15aabf',
     sleeveColor: '#22b8cf',
@@ -79,7 +80,7 @@ export const NPC_SPECS = {
   },
 
   bela: {
-    name: '贝拉',
+    name: NPC_NAMES.bela,
     hairColor: '#f76707',
     bodyColor: '#f76707',
     sleeveColor: '#ff922b',
@@ -112,7 +113,7 @@ export const NPC_SPECS = {
   },
 
   mystery: {
-    name: '问号先生',
+    name: NPC_NAMES.mystery,
     hairColor: '#111116',
     bodyColor: '#f8f9fa',
     sleeveColor: '#f8f9fa',

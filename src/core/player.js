@@ -1,12 +1,32 @@
-// Player controller: tap -> findPath -> walk 4.3 b/s (5.2 > 20), queued interaction <= 2.5 blocks,
+// Player controller: tap -> findPath -> walk 6.5 b/s (7.8 > 20), queued interaction <= 2.5 blocks,
 // and guaranteed synchronous feedback event on every tap (F3: feedback.dead === 0) (owner: core).
+// v1.1: 1.5x faster walking (was 4.3 / 5.2 / 1.6) with leg cadence scaled to speed, smooth turning and
+// corner rounding so fast walks along voxel paths never zigzag.
 import * as THREE from '../../vendor/three.module.min.js';
 
-const WALK_SPEED = 4.3;
-const LONG_WALK_SPEED = 5.2;
-const SNEAK_SPEED = 1.6;
+export const WALK_SPEED = 6.5;
+export const LONG_WALK_SPEED = 7.8;
+export const SNEAK_SPEED = 2.4;
+// Speeds the walk/run/crouch animations were authored for (leg swing frequency scales by speed / base).
+const ANIM_BASE_SPEED = { walk: 4.3, run: 5.2, crouch: 1.6 };
+// Authored leg-swing angular frequencies (rad/s) in src/chars/anim.js — footsteps land twice per cycle.
+const LEG_FREQ = { walk: 7.6, run: 11.5, crouch: 4.8 };
+const LONG_PATH_BLOCKS = 20;
+// Corner rounding: advance to the next waypoint this close to a corner (cuts <= ~0.3 block off 90° turns).
+const CORNER_RADIUS = 0.42;
+// Facing slew (1/s): turns ~95% of the way in ~0.19 s instead of snapping every waypoint.
+const TURN_RATE = 16;
 const INTERACT_RANGE = 2.5;
 const INTERACT_Y_TOLERANCE = 4.5;
+
+export const PLAYER_CONFIG = Object.freeze({
+  walkSpeed: WALK_SPEED,
+  longWalkSpeed: LONG_WALK_SPEED,
+  longPathBlocks: LONG_PATH_BLOCKS,
+  sneakSpeed: SNEAK_SPEED,
+  cornerRadius: CORNER_RADIUS,
+  turnRate: TURN_RATE,
+});
 
 export function createPlayer(ctx) {
   const pos = new THREE.Vector3(48, 8, 66);
@@ -23,6 +43,40 @@ export function createPlayer(ctx) {
     return Boolean(sneaking || ctx.state?.player?.sneak);
   }
 
+  // Current locomotion gait: anim name + speed (b/s). Long paths (> 20 blocks) run.
+  function currentGait(sneakNow) {
+    if (sneakNow) return { anim: 'crouch', speed: SNEAK_SPEED };
+    return initialPathLen > LONG_PATH_BLOCKS
+      ? { anim: 'run', speed: LONG_WALK_SPEED }
+      : { anim: 'walk', speed: WALK_SPEED };
+  }
+
+  // Leg swing frequency scales with speed: the anim clock runs at speed / authored-speed.
+  function applyGait(a, gait, isMoving = true) {
+    if (!a) return;
+    a.gaitRate = isMoving ? gait.speed / (ANIM_BASE_SPEED[gait.anim] || gait.speed) : 1;
+    a.setAnim?.(gait.anim);
+  }
+
+  function setIdleAnim(a, sneakNow) {
+    if (!a) return;
+    a.gaitRate = 1;
+    a.setAnim?.(sneakNow ? 'crouch' : 'idle');
+  }
+
+  // Smoothly slew facing toward (x, z) instead of snapping at every waypoint (fast turns stay fluid).
+  function turnToward(a, x, z, dt) {
+    const g = a?.group;
+    if (!g) return;
+    const dx = x - pos.x;
+    const dz = z - pos.z;
+    if (dx * dx + dz * dz < 1e-6) return;
+    const want = Math.atan2(dx, dz);
+    let diff = want - g.rotation.y;
+    diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+    g.rotation.y += diff * Math.min(1, dt * TURN_RATE);
+  }
+
   function setSneak(b) {
     const next = Boolean(b);
     sneaking = next;
@@ -30,12 +84,10 @@ export function createPlayer(ctx) {
       ctx.state.player.sneak = next;
     }
     const a = ensureActor();
-    if (next) {
-      a?.setAnim?.('crouch');
-    } else if (moving) {
-      a?.setAnim?.(initialPathLen > 20 ? 'run' : 'walk');
+    if (moving) {
+      applyGait(a, currentGait(next), true);
     } else {
-      a?.setAnim?.('idle');
+      setIdleAnim(a, next);
     }
   }
 
@@ -89,7 +141,7 @@ export function createPlayer(ctx) {
     if (faceNorth) {
       a?.lookAt?.({ x, y: gy, z: z - 10 });
     }
-    a?.setAnim?.('idle');
+    setIdleAnim(a, false);
     syncState();
   }
 
@@ -100,7 +152,7 @@ export function createPlayer(ctx) {
     queuedTarget = null;
     queuedCallback = null;
     stepTimer = 0;
-    ensureActor()?.setAnim?.(isSneaking() ? 'crouch' : 'idle');
+    setIdleAnim(ensureActor(), isSneaking());
     syncState();
   }
 
@@ -274,9 +326,8 @@ export function createPlayer(ctx) {
     moving = path.length > 0;
 
     if (moving) {
-      const a = ensureActor();
-      a?.setAnim?.(isSneaking() ? 'crouch' : initialPathLen > 20 ? 'run' : 'walk');
-      a?.lookAt?.(path[0]);
+      // Facing slews toward path[0] in update() (no instant snap on every re-tap).
+      applyGait(ensureActor(), currentGait(isSneaking()), true);
     }
     syncState();
     return path[path.length - 1];
@@ -306,7 +357,7 @@ export function createPlayer(ctx) {
       queuedTarget = null;
       queuedCallback = null;
       a?.lookAt?.(tgt.pos);
-      a?.setAnim?.(sneakNow ? 'crouch' : 'idle');
+      setIdleAnim(a, sneakNow);
       syncState();
       if (typeof cb === 'function') {
         cb(tgt);
@@ -316,15 +367,25 @@ export function createPlayer(ctx) {
     }
 
     if (moving && path.length > 0) {
-      const speed = sneakNow ? SNEAK_SPEED : initialPathLen > 20 ? LONG_WALK_SPEED : WALK_SPEED;
-      a?.setAnim?.(sneakNow ? 'crouch' : initialPathLen > 20 ? 'run' : 'walk');
-      let budget = speed * dt;
+      const gait = currentGait(sneakNow);
+      applyGait(a, gait, true);
+      let budget = gait.speed * dt;
+      let headTo = path[0];
 
       while (budget > 0 && path.length > 0) {
         const wp = path[0];
         const dx = wp.x - pos.x;
         const dz = wp.z - pos.z;
         const dist2d = Math.hypot(dx, dz);
+        headTo = wp;
+
+        if (path.length > 1 && dist2d < CORNER_RADIUS) {
+          // Corner rounding: retarget the next waypoint a little before the corner so fast walks curve
+          // instead of zigzagging cell-to-cell (y keeps easing toward the next waypoint below).
+          path.shift();
+          headTo = path[0];
+          continue;
+        }
 
         if (dist2d <= budget || dist2d < 0.04) {
           pos.x = wp.x;
@@ -339,7 +400,6 @@ export function createPlayer(ctx) {
           pos.z += uz * budget;
           const targetY = Number.isFinite(wp.y) ? wp.y : resolveGroundY(pos.x, pos.z, pos.y);
           pos.y += (targetY - pos.y) * Math.min(1, dt * 14);
-          a?.lookAt?.(wp);
           budget = 0;
         }
 
@@ -353,7 +413,7 @@ export function createPlayer(ctx) {
           queuedTarget = null;
           queuedCallback = null;
           a?.lookAt?.(tgt.pos);
-          a?.setAnim?.(isSneaking() ? 'crouch' : 'idle');
+          setIdleAnim(a, isSneaking());
           if (a?.group) a.group.position.copy(pos);
           syncState();
           if (typeof cb === 'function') {
@@ -364,8 +424,12 @@ export function createPlayer(ctx) {
         }
       }
 
+      if (headTo) turnToward(a, headTo.x, headTo.z, dt);
+
+      // One footstep per half leg cycle (cadence follows the speed-scaled walk animation).
       stepTimer += dt;
-      const stepInterval = sneakNow ? 0.62 : 0.34;
+      const legFreq = (LEG_FREQ[gait.anim] || LEG_FREQ.walk) * (a?.gaitRate || 1);
+      const stepInterval = Math.PI / legFreq;
       if (stepTimer >= stepInterval) {
         stepTimer = 0;
         ctx.events.emit('sfx', { name: stepSoundForArea() });
@@ -373,7 +437,7 @@ export function createPlayer(ctx) {
 
       if (path.length === 0) {
         moving = false;
-        a?.setAnim?.(isSneaking() ? 'crouch' : 'idle');
+        setIdleAnim(a, isSneaking());
         // If we reached the closest walkable cell and have a queued target slightly elevated/fenced (e.g. cage bars <= 3.4)
         if (queuedTarget && isInRange(queuedTarget.pos, 3.4)) {
           const tgt = queuedTarget;
@@ -390,7 +454,7 @@ export function createPlayer(ctx) {
         }
       }
     } else if (sneakNow) {
-      a?.setAnim?.('crouch');
+      setIdleAnim(a, true);
     }
 
     if (a?.group) {
@@ -413,6 +477,9 @@ export function createPlayer(ctx) {
     walkTo,
     stop,
     isMoving: () => Boolean(moving),
+    // Current locomotion speed in blocks/s (0 when standing) — the follow camera tightens with it.
+    currentSpeed: () => (moving && path.length > 0 ? currentGait(isSneaking()).speed : 0),
+    config: PLAYER_CONFIG,
     setSneak,
     setSneaking: setSneak,
     isSneaking,
