@@ -112,6 +112,35 @@ export function createHudUI(ctx = {}, hooks = {}) {
   beaconInner.append(beaconFaceCanvas, beaconArrowPivot);
   beaconBtn.appendChild(beaconInner);
 
+  const jumpBtn = document.createElement('button');
+  jumpBtn.type = 'button';
+  jumpBtn.id = 'hud-jump-btn';
+  jumpBtn.className = 'mc-btn mc-btn-green hud-jump-btn';
+  jumpBtn.setAttribute('aria-label', 'Jump forward');
+  jumpBtn.title = 'Jump forward (Space). Tap a nearby gem platform to aim.';
+  jumpBtn.innerHTML = '<strong>↗ Jump</strong><small></small>';
+  const gemCount = jumpBtn.querySelector('small');
+  const prize = document.createElement('output');
+  prize.className = 'trail-prize';
+  prize.hidden = true;
+  let prizeTimer;
+  ctx.events?.on('trailPrize', ({ name, count }) => {
+    prize.textContent = count === 3 ? '🏅 ' + name + ' complete!' : '💎 ' + name + ' ' + count + '/3';
+    prize.hidden = false;
+    clearTimeout(prizeTimer);
+    prizeTimer = setTimeout(() => { prize.hidden = true; }, 2400);
+  });
+  function jump() {
+    if (hudRoot.hidden || ctx.state?.scene !== 'world' || ctx.state?.gagCam?.active) return;
+    if (!ctx.player?.jumpForward() && !ctx.player?.isJumping()) ctx.events?.emit('sfx', { name: 'blocked' });
+  }
+  bindTap(jumpBtn, jump, { ctx, sfx: null });
+  window.addEventListener('keydown', ev => {
+    if (ev.code !== 'Space' || hudRoot.hidden || ev.target.closest?.('input, textarea, select, button, [contenteditable=true]')) return;
+    ev.preventDefault();
+    if (!ev.repeat) jump();
+  });
+  hudRoot.append(jumpBtn, prize);
   hudRoot.append(boardBtn, objStrip, pauseBtn, actionBtn, beaconBtn);
 
   let currentAction = null;
@@ -215,6 +244,7 @@ export function createHudUI(ctx = {}, hooks = {}) {
       cx = Math.max(minCx, vw - 156);
     }
 
+    if (cx < 145 && cy > vh - 142) cx = 145;
     const angle = Number.isFinite(guide.angle)
       ? guide.angle
       : Math.atan2(cy - vh * 0.5, cx - vw * 0.5);
@@ -280,6 +310,8 @@ export function createHudUI(ctx = {}, hooks = {}) {
     const st = state || ctx.state;
     if (!st) return;
 
+    const total = st.trailGems?.length || 0;
+    gemCount.textContent = '💎 ' + total + '/9';
     const board = st.board || {};
     let mainRanked = 0;
     let hiddenRanked = 0;
@@ -357,6 +389,12 @@ export function createHudUI(ctx = {}, hooks = {}) {
   }
 
   function applyVisibility(visible) {
+    if (visible && hudRoot.hidden && !ctx.state?.trailGems?.length) {
+      prize.textContent = 'Tap a nearby gem platform to jump!';
+      prize.hidden = false;
+      clearTimeout(prizeTimer);
+      prizeTimer = setTimeout(() => { prize.hidden = true; }, 4500);
+    }
     hudRoot.hidden = !visible;
     hudRoot.classList.toggle('ui-hidden', !visible);
     if (visible) {

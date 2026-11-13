@@ -1,3 +1,4 @@
+import { trails } from './jump-trails.js';
 import { B } from './blocks.js';
 import { WX, WY, WZ } from './chunks.js';
 
@@ -1191,6 +1192,13 @@ export function buildWorldLayout(voxels) {
   // ============================================================================
   // 13. ALL 33 BINDING `poi` KEYS (§5) + EXTRA LANDMARKS
   // ============================================================================
+  for (const { block, pads } of trails) {
+    for (const [x, z, top] of pads) {
+      fill(x, 7, z, x + 1, top - 1, z + 1, block);
+      clearAir(x, top, z, x + 1, top + 2, z + 1);
+    }
+  }
+
   const poi = Object.freeze({
     spawn: { x: 48.5, y: 8, z: 66.5 },
     plaza: { x: 48.5, y: 8, z: 48.5 },

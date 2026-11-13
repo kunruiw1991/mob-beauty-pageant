@@ -63,6 +63,7 @@ export function saveProgress(data = {}) {
       area: data.area ?? prev.area ?? 'hub',
       elapsedMs: Number(data.elapsedMs ?? prev.elapsedMs ?? 0),
       stars: Number(data.stars ?? prev.stars ?? 0),
+      trailGems: data.trailGems ?? prev.trailGems ?? [],
       board: { ...(prev.board || {}), ...(data.board || {}) },
       quests: { ...(prev.quests || {}), ...(data.quests || {}) },
       contestants: { ...(prev.contestants || {}), ...(data.contestants || {}) },
@@ -112,6 +113,7 @@ export function saveFromState(state, extra = {}) {
     }
   }
   return saveProgress({
+    trailGems: state.trailGems,
     seed: state.seed,
     area: state.area,
     elapsedMs: state.elapsedMs ?? state.timeMs ?? 0,
@@ -165,7 +167,7 @@ export function hasSavedProgress() {
   const doneQuests = p.quests
     ? Object.values(p.quests).filter((q) => q && (q === 'done' || q.status === 'done')).length
     : 0;
-  return rankedCount > 0 || doneQuests > 0;
+  return rankedCount > 0 || doneQuests > 0 || Boolean(p.trailGems?.length);
 }
 
 export const progress = Object.freeze({

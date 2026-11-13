@@ -20,6 +20,7 @@ from the quests and the rival, never from looks.
 | Action | Touch / mouse |
 |---|---|
 | Walk | Tap the ground (or anything — you walk to it) |
+| Jump forward | Tap ↗ Jump or press Space. Tap a nearby gem platform to aim your jump at it. |
 | Interact | Tap the glowing thing / the contestant (you walk over first) |
 | Look around | Drag on the world with one finger |
 | Find the next contestant | Follow the light beacon, or tap the edge arrow with her face |
@@ -27,7 +28,7 @@ from the quests and the rival, never from looks.
 | Leaderboard / pause | 🏆 chip top-left · ⏸ top-right |
 | Music / sounds / voice | ⏸ → 🎵 Music · 🔔 Sounds · 🔊 Voice (the voice setting is remembered) |
 
-≤ 4 buttons on screen while playing, all ≥ 68 px. No text walls: icons, beacons, picture hints and short spoken
+Find nine gems on the optional Honey Steps, Frost Switchback and Marsh Skips trails. Land on a gem with a jump to collect it. All three gems on a trail trigger a celebration. No text walls: icons, beacons, picture hints and short spoken
 lines (with subtitles) show the way. Progress (board, portraits, stars) is saved in the browser
 (`pageant_progress`). A full run takes about 12–20 minutes.
 

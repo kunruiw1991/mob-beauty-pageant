@@ -2475,3 +2475,26 @@ html, body {
     padding: 4px 8px;
   }
 }
+
+.hud-jump-btn {
+  position: fixed;
+  left: max(14px, var(--safe-l));
+  bottom: max(14px, var(--safe-b));
+  min-width: 84px;
+  min-height: 70px;
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  font-size: 18px;
+}
+.hud-jump-btn small { font-size: 13px; }
+.trail-prize {
+  position: fixed;
+  left: max(14px, var(--safe-l));
+  bottom: calc(max(14px, var(--safe-b)) + 78px);
+  padding: 8px 12px;
+  background: #22283d;
+  border: 2px solid #ffd967;
+  color: white;
+  font-weight: 800;
+}

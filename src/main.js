@@ -1,4 +1,5 @@
 // Main integrator & pageant game flow per docs/DESIGN.md §1–§11 (owner: core).
+import { padAt, createTrailGems, trails } from './world/jump-trails.js';
 import * as THREE from '../vendor/three.module.min.js';
 import * as ROSTER_MODULE from './data/roster.js';
 import { ROSTER, ROSTER_BY_ID, TIERS } from './data/roster.js';
@@ -277,6 +278,18 @@ async function boot() {
   // Picker, Player, Areas, Rival, Quests
   ctx.pick = createPicker(ctx);
   ctx.player = createPlayer(ctx);
+  const updateGems = createTrailGems(ctx.scene);
+  updateGems(state, 0);
+  events.on('jumpLand', (pos) => {
+    const hit = padAt(pos.x, pos.z);
+    if (!hit || pos.y !== hit.pad[2] || state.trailGems.includes(hit.key)) return;
+    state.trailGems.push(hit.key);
+    const count = hit.trail.pads.filter((_, i) => state.trailGems.includes(hit.trail.name + i)).length;
+    events.emit('trailPrize', { name: hit.trail.name, count });
+    events.emit('sfx', { name: count === 3 ? 'fanfare' : 'pickup' });
+    if (count === 3) ctx.fx?.confetti?.('screen', 64);
+    saveStateProgress();
+  });
   ctx.areas = createAreas(ctx);
   ctx.rival = createRival(ctx);
   ctx.quests = createQuestManager(ctx);
@@ -846,6 +859,19 @@ async function boot() {
       return true;
     }
 
+    if (ctx.player.isJumping()) {
+      events.emit('feedback', { kind: 'interact', pos: safePos });
+      return true;
+    }
+    const landing = hit?.type === 'block' && padAt(safePos.x, safePos.z);
+    if (landing && Math.floor(safePos.y) === landing.pad[2] - 1) {
+      const [x, z] = landing.pad;
+      if (ctx.player.jumpForward({ x: x + 1, z: z + 1 })) {
+        events.emit('feedback', { kind: 'walk', pos: safePos });
+        return true;
+      }
+    }
+
     // 1. Let active quest / beacon / passive hidden quests handle entity or in-range taps
     const questHandled = Boolean(ctx.quests?.onTap?.(hit));
     if (questHandled) {
@@ -1134,6 +1160,8 @@ async function boot() {
       state.seed = normalizeSeedNumber(saved.seed);
       ctx.rng.reset(state.seed);
     }
+    const keys = trails.flatMap(trail => trail.pads.map((_, i) => trail.name + i));
+    state.trailGems = keys.filter(key => Array.isArray(saved.trailGems) && saved.trailGems.includes(key));
     if (saved.elapsedMs !== undefined) {
       state.elapsedMs = Math.max(0, Number(saved.elapsedMs) || 0);
       state._runFrames = Math.round((state.elapsedMs / 1000) * 60);
@@ -1717,6 +1745,7 @@ async function boot() {
     ctx,
     onSlice: drainBuildSlice,
     onStep(dt) {
+      updateGems(state, ctx.time);
       capturePrevPose();
       if (state.scene === 'world') {
         ctx.areas.update(dt);

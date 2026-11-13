@@ -31,6 +31,7 @@ export const PLAYER_CONFIG = Object.freeze({
 export function createPlayer(ctx) {
   const pos = new THREE.Vector3(48, 8, 66);
   let actor = null;
+  let flight = null;
   let path = [];
   let initialPathLen = 0;
   let moving = false;
@@ -123,6 +124,7 @@ export function createPlayer(ctx) {
 
   function setPosition(x, y, z, { faceNorth = false } = {}) {
     const gy = Number.isFinite(y) ? y : resolveGroundY(x, z, 8);
+    flight = null;
     pos.set(x, gy, z);
     path = [];
     initialPathLen = 0;
@@ -146,6 +148,11 @@ export function createPlayer(ctx) {
   }
 
   function stop() {
+    if (flight) {
+      pos.copy(flight.start);
+      ensureActor()?.group?.position.copy(pos);
+      flight = null;
+    }
     path = [];
     initialPathLen = 0;
     moving = false;
@@ -306,6 +313,7 @@ export function createPlayer(ctx) {
   }
 
   function walkTo(destPos, { maxSearchR = 6, allowClamp = false, onArrive = null, target = null } = {}) {
+    if (flight) return null;
     const waypoints = computePathTo(destPos, maxSearchR, allowClamp);
     if (!waypoints || waypoints.length === 0) {
       return null;
@@ -333,6 +341,54 @@ export function createPlayer(ctx) {
     return path[path.length - 1];
   }
 
+  function arcY(start, end, t) {
+    return start + (end - start) * t + 8 * t * (1 - t);
+  }
+
+  function jumpForward(target) {
+    if (flight || ctx.state.scene !== 'world' || ctx.state.gagCam?.active || ctx.loop?.isPaused?.()) return false;
+    const world = ctx.world;
+    const yaw = ensureActor()?.group?.rotation.y ?? Math.PI;
+    const dx = target ? target.x - pos.x : Math.sin(yaw);
+    const dz = target ? target.z - pos.z : Math.cos(yaw);
+    const length = Math.hypot(dx, dz);
+    if (length < 0.01 || (target && length > 4.6)) return false;
+    for (let distance = target ? length : 4; distance >= 0.65; distance -= 0.5) {
+      const x = pos.x + dx / length * distance;
+      const z = pos.z + dz / length * distance;
+      const y = world.surfaceY(Math.floor(x), Math.floor(z));
+      if (Math.abs(y - pos.y) > 2.1 || !world.isWalkable(x,y,z)) {
+        if (target) break;
+        continue;
+      }
+      // Sweep the player's feet and head so a legal landing cannot tunnel through a wall.
+      let clear = true;
+      for (let i = 1; i <= 32 && clear; i++) {
+        const t = i / 32;
+        const feet = arcY(pos.y, y, t) + 0.01;
+        for (const ox of [-0.16, 0.16]) for (const oz of [-0.16, 0.16]) {
+          for (let h = Math.floor(feet); h <= Math.floor(feet + 1.65); h++) {
+            const id = world.getBlock(pos.x + (x-pos.x)*t + ox, h, pos.z + (z-pos.z)*t + oz);
+            const props = world.getBlockProps(id);
+            if (props?.solid || props?.blocksWalk) clear = false;
+          }
+        }
+      }
+      if (clear) {
+        stop();
+        flight = { start: pos.clone(), end: new THREE.Vector3(x,y,z), t: 0 };
+        moving = true;
+        const a = ensureActor();
+        a?.lookAt?.(flight.end);
+        a?.setAnim?.('run');
+        ctx.events.emit('sfx', { name: 'boing' });
+        return true;
+      }
+      if (target) break;
+    }
+    return false;
+  }
+
   function stepSoundForArea() {
     const area = ctx.state?.area;
     if (area === 'nether' || area === 'end') return 'step_stone';
@@ -346,6 +402,23 @@ export function createPlayer(ctx) {
   function update(dt) {
     const a = ensureActor();
     const sneakNow = isSneaking();
+
+    if (flight) {
+      flight.t = Math.min(1, flight.t + dt / 0.62);
+      const { start, end, t } = flight;
+      pos.lerpVectors(start, end, t);
+      pos.y = arcY(start.y, end.y, t);
+      a?.group?.position.copy(pos);
+      a?.update?.(dt);
+      if (t === 1) {
+        flight = null;
+        moving = false;
+        setIdleAnim(a, sneakNow);
+        ctx.events.emit('jumpLand', pos);
+      }
+      syncState();
+      return;
+    }
 
     // Check queued interaction range even mid-walk (§6: 2.5 blocks)
     if (queuedTarget && isInRange(queuedTarget.pos, INTERACT_RANGE)) {
@@ -474,6 +547,8 @@ export function createPlayer(ctx) {
     },
     ensureActor,
     setPosition,
+    jumpForward,
+    isJumping: () => Boolean(flight),
     walkTo,
     stop,
     isMoving: () => Boolean(moving),
