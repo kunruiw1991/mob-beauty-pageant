@@ -242,6 +242,9 @@ export function buildWorldLayout(voxels) {
     set(fx, 8, fz, fid);
   }
   placeTree(57, 8, 78, B.OAK_LOG, B.OAK_LEAVES, 5, false);
+  // Hero climbable Meadow Oak Trees flanking Spawn & Honey Steps so players can hop straight onto canopies!
+  placeTree(62, 8, 66, B.OAK_LOG, B.OAK_LEAVES, 5, false);
+  placeTree(36, 8, 65, B.OAK_LOG, B.OAK_LEAVES, 5, false);
 
   // ============================================================================
   // 4. SE SWAMP (62..82, 58..78) — dark water, lily pads, vines

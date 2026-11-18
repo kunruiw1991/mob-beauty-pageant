@@ -3,6 +3,7 @@
 // v1.1: 1.5x faster walking (was 4.3 / 5.2 / 1.6) with leg cadence scaled to speed, smooth turning and
 // corner rounding so fast walks along voxel paths never zigzag.
 import * as THREE from '../../vendor/three.module.min.js';
+import { trails, TREE_CROWNS } from '../world/jump-trails.js';
 
 export const WALK_SPEED = 6.5;
 export const LONG_WALK_SPEED = 7.8;
@@ -32,6 +33,7 @@ export function createPlayer(ctx) {
   const pos = new THREE.Vector3(48, 8, 66);
   let actor = null;
   let flight = null;
+  let joySpin = null;
   let path = [];
   let initialPathLen = 0;
   let moving = false;
@@ -39,6 +41,34 @@ export function createPlayer(ctx) {
   let queuedTarget = null;
   let queuedCallback = null;
   let stepTimer = 0;
+  let leafStepTimer = 0;
+
+  function isOnTree() {
+    return Boolean(
+      pos.y >= 10 &&
+      ctx.world?.isTreeStandable?.(pos.x, Math.round(pos.y), pos.z)
+    );
+  }
+
+  function getUncollectedCrowns() {
+    const owned = ctx.state?.treeCrowns || [];
+    return TREE_CROWNS.filter((c) => !owned.includes(c.id));
+  }
+
+  function hasNearbyTree() {
+    if (flight || ctx.state?.scene !== 'world' || ctx.state?.area !== 'hub') return false;
+    const yaw = ensureActor()?.group?.rotation?.y ?? Math.PI;
+    const onTree = isOnTree();
+    return Boolean(
+      ctx.world?.findTreePerchAhead?.(pos.x, pos.y, pos.z, yaw, {
+        maxDist: onTree ? 13.5 : 9.2,
+        minDist: 0.85,
+        coneCos: 0.12,
+        excludeRadius: onTree ? 3.2 : 0,
+        crownTargets: getUncollectedCrowns(),
+      })
+    );
+  }
 
   function isSneaking() {
     return Boolean(sneaking || ctx.state?.player?.sneak);
@@ -125,6 +155,7 @@ export function createPlayer(ctx) {
   function setPosition(x, y, z, { faceNorth = false } = {}) {
     const gy = Number.isFinite(y) ? y : resolveGroundY(x, z, 8);
     flight = null;
+    joySpin = null;
     pos.set(x, gy, z);
     path = [];
     initialPathLen = 0;
@@ -139,6 +170,7 @@ export function createPlayer(ctx) {
     const a = ensureActor();
     if (a?.group) {
       a.group.position.copy(pos);
+      a.group.rotation.x = 0;
     }
     if (faceNorth) {
       a?.lookAt?.({ x, y: gy, z: z - 10 });
@@ -150,8 +182,21 @@ export function createPlayer(ctx) {
   function stop() {
     if (flight) {
       pos.copy(flight.start);
-      ensureActor()?.group?.position.copy(pos);
+      const g = ensureActor()?.group;
+      if (g) {
+        g.position.copy(pos);
+        g.rotation.x = 0;
+      }
       flight = null;
+    }
+    if (joySpin) {
+      pos.y = joySpin.baseY;
+      const g = ensureActor()?.group;
+      if (g) {
+        g.position.copy(pos);
+        g.rotation.y = joySpin.startYaw;
+      }
+      joySpin = null;
     }
     path = [];
     initialPathLen = 0;
@@ -312,8 +357,77 @@ export function createPlayer(ctx) {
     return total;
   }
 
-  function walkTo(destPos, { maxSearchR = 6, allowClamp = false, onArrive = null, target = null } = {}) {
+  function findGroundLandingToward(destX, destZ) {
+    const world = ctx.world;
+    if (!world?.isWalkable || !world?.surfaceY) return null;
+    const dx = destX - pos.x;
+    const dz = destZ - pos.z;
+    const len = Math.hypot(dx, dz);
+    const ux = len > 0.01 ? dx / len : 0;
+    const uz = len > 0.01 ? dz / len : 1;
+
+    // Probe a clean landing ring 2.4..7.5 blocks toward destX/destZ first, then any open spot around tree base
+    for (const dist of [3.4, 4.4, 2.6, 5.5, 6.6]) {
+      for (const angOff of [0, 0.4, -0.4, 0.85, -0.85, 1.4, -1.4, Math.PI]) {
+        const c = Math.cos(angOff);
+        const s = Math.sin(angOff);
+        const rx = ux * c - uz * s;
+        const rz = ux * s + uz * c;
+        const tx = Math.floor(pos.x + rx * dist);
+        const tz = Math.floor(pos.z + rz * dist);
+        const ty = world.surfaceY(tx, tz);
+        if (ty >= 6 && ty <= 10 && world.isWalkable(tx, ty, tz)) {
+          return { x: tx + 0.5, y: ty, z: tz + 0.5 };
+        }
+      }
+    }
+    return null;
+  }
+
+  function walkTo(destPos, opts = {}) {
+    const { maxSearchR = 6, allowClamp = false, onArrive = null, target = null } = opts;
     if (flight) return null;
+    if (joySpin) {
+      pos.y = joySpin.baseY;
+      const g = ensureActor()?.group;
+      if (g) {
+        g.position.copy(pos);
+        g.rotation.y = joySpin.startYaw;
+      }
+      joySpin = null;
+    }
+
+    // If currently perched high on a tree canopy:
+    if (isOnTree() && destPos) {
+      const gx = Number(destPos.x);
+      const gz = Number(destPos.z);
+      const dist2d = Math.hypot(gx - pos.x, gz - pos.z);
+      const topY = ctx.world?.treeTopY?.(gx, gz) || 0;
+
+      // 1. Tapped another leaf on the same tree crown -> stroll smoothly across the canopy!
+      if (topY >= 10 && dist2d <= 4.4 && Math.abs(topY - pos.y) <= 2.2) {
+        path = [{ x: Math.floor(gx) + 0.5, y: topY, z: Math.floor(gz) + 0.5 }];
+        initialPathLen = Math.ceil(dist2d);
+        queuedTarget = target;
+        queuedCallback = onArrive;
+        moving = true;
+        applyGait(ensureActor(), currentGait(isSneaking()), true);
+        syncState();
+        return path[0];
+      }
+
+      // 2. Tapped ground, NPC, quest, or beacon -> gracefully Super-Dive off the tree and keep walking!
+      const landSpot = findGroundLandingToward(gx, gz);
+      if (landSpot) {
+        const continueWalk = Math.hypot(gx - landSpot.x, gz - landSpot.z) > 1.6 || Boolean(onArrive || target);
+        jumpTo(landSpot, {
+          kind: 'tree_dive',
+          afterLand: continueWalk ? () => walkTo(destPos, opts) : null,
+        });
+        return landSpot;
+      }
+    }
+
     const waypoints = computePathTo(destPos, maxSearchR, allowClamp);
     if (!waypoints || waypoints.length === 0) {
       return null;
@@ -341,50 +455,207 @@ export function createPlayer(ctx) {
     return path[path.length - 1];
   }
 
-  function arcY(start, end, t) {
-    return start + (end - start) * t + 8 * t * (1 - t);
+  function arcY(start, end, peakY, t) {
+    const ctrlY = 2 * peakY - 0.5 * (start + end);
+    const u = 1 - t;
+    return u * u * start + 2 * u * t * ctrlY + t * t * end;
+  }
+
+  function jumpTo(endPos, opts = {}) {
+    if (!endPos || ctx.state.scene !== 'world' || ctx.state.gagCam?.active || ctx.loop?.isPaused?.()) return false;
+    const ex = Number(endPos.x);
+    const ey = Number(endPos.y);
+    const ez = Number(endPos.z);
+    if (!Number.isFinite(ex) || !Number.isFinite(ey) || !Number.isFinite(ez)) return false;
+
+    const startPos = pos.clone();
+    const dist = Math.hypot(ex - startPos.x, ez - startPos.z);
+    const rise = Math.max(0, ey - startPos.y);
+    const drop = Math.max(0, startPos.y - ey);
+    const isTreeLanding = Boolean(opts.isTreePerch || (ey >= 10 && ctx.world?.isTreeStandable?.(ex, Math.round(ey), ez)));
+    const superBounce = Boolean(opts.superBounce);
+    const peakExtra = superBounce
+      ? Math.max(3.6, rise * 0.34 + 2.6)
+      : isTreeLanding
+        ? Math.max(2.3, rise * 0.25 + 1.8)
+        : Math.max(1.9, rise * 0.22 + 1.5);
+    const peakY = Math.max(startPos.y, ey) + peakExtra;
+    const dur = Math.min(0.92, Math.max(0.46, 0.44 + dist * 0.025 + (rise + drop) * 0.024));
+
+    stop();
+    flight = {
+      start: startPos,
+      end: new THREE.Vector3(ex, ey, ez),
+      peakY,
+      dur,
+      t: 0,
+      fromY: startPos.y,
+      toTree: isTreeLanding,
+      kind: opts.kind || (isTreeLanding ? 'tree_vault' : 'hop'),
+      flipped: false,
+      flipT: 0,
+      afterLand: typeof opts.afterLand === 'function' ? opts.afterLand : null,
+    };
+    moving = true;
+    const a = ensureActor();
+    a?.lookAt?.(flight.end);
+    a?.setAnim?.('run');
+    ctx.events.emit('sfx', { name: 'boing' });
+    if (superBounce) {
+      ctx.fx?.burst?.(startPos, 0x5ce643, 18);
+      ctx.fx?.sparkles?.(startPos, 14);
+      ctx.fx?.ring?.(startPos, 0x70e000);
+    } else if (isTreeLanding) {
+      ctx.fx?.sparkles?.(startPos, 8);
+    }
+    syncState();
+    return true;
+  }
+
+  function triggerMidAirFlip() {
+    if (!flight || flight.flipped) return false;
+    flight.flipped = true;
+    flight.flipT = 0;
+    flight.peakY += 0.85;
+    if (ctx.state) {
+      ctx.state.midAirFlips = (ctx.state.midAirFlips || 0) + 1;
+    }
+    ctx.fx?.sparkles?.(pos, 14);
+    ctx.fx?.popup?.(pos, '🌀');
+    ctx.events.emit('sfx', { name: 'note4' });
+    return true;
+  }
+
+  function triggerJoySpin() {
+    if (flight || moving || ctx.state.scene !== 'world' || ctx.state.gagCam?.active) return false;
+    const a = ensureActor();
+    const startYaw = a?.group?.rotation?.y ?? Math.PI;
+    joySpin = { t: 0, dur: 0.44, baseY: pos.y, startYaw };
+    const sounds = ['boing', 'pop', 'cheer', 'note5'];
+    const sfx = sounds[Math.floor((ctx.frame || 0) % sounds.length)];
+    ctx.events.emit('sfx', { name: sfx });
+    ctx.fx?.sparkles?.(pos, 14);
+    ctx.fx?.confetti?.(pos, 18);
+    ctx.fx?.popup?.(pos, '🥳');
+    return true;
+  }
+
+  function findNearbyTrailPadAhead(yaw) {
+    if (ctx.state?.area !== 'hub') return null;
+    const fx = Math.sin(yaw);
+    const fz = Math.cos(yaw);
+    const owned = ctx.state?.trailGems || [];
+    let best = null;
+    let bestScore = -Infinity;
+    for (const trail of trails) {
+      for (let i = 0; i < trail.pads.length; i++) {
+        const [px, pz, py] = trail.pads[i];
+        const cx = px + 1;
+        const cz = pz + 1;
+        const dist = Math.hypot(cx - pos.x, cz - pos.z);
+        if (dist < 1.1 || dist > 5.8) continue;
+        if (Math.abs(py - pos.y) > 3.6) continue;
+        const dot = ((cx - pos.x) * fx + (cz - pos.z) * fz) / Math.max(0.001, dist);
+        if (dot < 0.25 && dist > 3.2) continue;
+        const unowned = !owned.includes(trail.name + i);
+        const score = dot * 3.0 - dist * 0.5 + (unowned ? 3.5 : 0);
+        if (score > bestScore) {
+          bestScore = score;
+          best = { x: cx, y: py, z: cz };
+        }
+      }
+    }
+    return best;
   }
 
   function jumpForward(target) {
-    if (flight || ctx.state.scene !== 'world' || ctx.state.gagCam?.active || ctx.loop?.isPaused?.()) return false;
+    if (ctx.state.scene !== 'world' || ctx.state.gagCam?.active || ctx.loop?.isPaused?.()) return false;
+    // Pressing Jump again mid-air does a fun 360° Somersault Flip!
+    if (flight) {
+      return triggerMidAirFlip();
+    }
+
     const world = ctx.world;
     const yaw = ensureActor()?.group?.rotation.y ?? Math.PI;
-    const dx = target ? target.x - pos.x : Math.sin(yaw);
-    const dz = target ? target.z - pos.z : Math.cos(yaw);
-    const length = Math.hypot(dx, dz);
-    if (length < 0.01 || (target && length > 4.6)) return false;
-    for (let distance = target ? length : 4; distance >= 0.65; distance -= 0.5) {
-      const x = pos.x + dx / length * distance;
-      const z = pos.z + dz / length * distance;
-      const y = world.surfaceY(Math.floor(x), Math.floor(z));
-      if (Math.abs(y - pos.y) > 2.1 || !world.isWalkable(x,y,z)) {
-        if (target) break;
-        continue;
+    const onTreeNow = isOnTree();
+
+    // 1. Explicit target (tapped tree perch or tapped gem platform!)
+    if (target) {
+      const tx = Number(target.x);
+      const tz = Number(target.z);
+      const dist = Math.hypot(tx - pos.x, tz - pos.z);
+      const isTreeTarget = Boolean(
+        target.isTreePerch ||
+        (Number.isFinite(target.y) && target.y >= 10 && world.isTreeStandable?.(tx, Math.round(target.y), tz))
+      );
+      if (isTreeTarget && dist >= 0.4 && dist <= 15.0) {
+        const ty = Number.isFinite(target.y) ? target.y : world.treeTopY?.(tx, tz);
+        if (ty >= 10) {
+          return jumpTo({ x: tx, y: ty, z: tz }, { isTreePerch: true, kind: onTreeNow ? 'tree_hop' : 'tree_vault' });
+        }
       }
-      // Sweep the player's feet and head so a legal landing cannot tunnel through a wall.
+      if (dist >= 0.4 && dist <= 6.2) {
+        const y = Number.isFinite(target.y) ? target.y : world.surfaceY(Math.floor(tx), Math.floor(tz));
+        if (Math.abs(y - pos.y) <= 4.2 && world.isWalkable(tx, y, tz)) {
+          return jumpTo({ x: tx, y, z: tz }, { kind: 'pad_hop' });
+        }
+      }
+      return false;
+    }
+
+    // 2. Smart auto-aim when kid presses Jump / Space:
+    // 2a. Nearby gem trail platform ahead
+    const padTarget = findNearbyTrailPadAhead(yaw);
+    if (padTarget && world.isWalkable(padTarget.x, padTarget.y, padTarget.z)) {
+      return jumpTo(padTarget, { kind: 'pad_hop' });
+    }
+
+    // 2b. Nearby tree canopy (or treetop-to-treetop leap when already on a tree!)
+    if (ctx.state?.area === 'hub' && world.findTreePerchAhead) {
+      const perch = world.findTreePerchAhead(pos.x, pos.y, pos.z, yaw, {
+        maxDist: onTreeNow ? 13.5 : 9.2,
+        minDist: 0.85,
+        coneCos: 0.12,
+        excludeRadius: onTreeNow ? 3.2 : 0,
+        crownTargets: getUncollectedCrowns(),
+      });
+      if (perch) {
+        return jumpTo(perch, { isTreePerch: true, kind: onTreeNow ? 'tree_hop' : 'tree_vault' });
+      }
+    }
+
+    // 2c. If standing on a tree with no other tree ahead -> joyful Hero Super-Dive down to ground!
+    if (onTreeNow) {
+      const landSpot = findGroundLandingToward(pos.x + Math.sin(yaw) * 4.5, pos.z + Math.cos(yaw) * 4.5);
+      if (landSpot) {
+        return jumpTo(landSpot, { kind: 'tree_dive' });
+      }
+    }
+
+    // 2d. Standard bouncy forward hop onto walkable ground
+    const dx = Math.sin(yaw);
+    const dz = Math.cos(yaw);
+    for (let distance = 4.0; distance >= 0.65; distance -= 0.5) {
+      const x = pos.x + dx * distance;
+      const z = pos.z + dz * distance;
+      const y = world.surfaceY(Math.floor(x), Math.floor(z));
+      if (Math.abs(y - pos.y) > 2.6 || !world.isWalkable(x, y, z)) continue;
+      const peakY = Math.max(pos.y, y) + 1.9;
       let clear = true;
-      for (let i = 1; i <= 32 && clear; i++) {
-        const t = i / 32;
-        const feet = arcY(pos.y, y, t) + 0.01;
+      for (let i = 1; i <= 24 && clear; i++) {
+        const t = i / 24;
+        const feet = arcY(pos.y, y, peakY, t) + 0.01;
         for (const ox of [-0.16, 0.16]) for (const oz of [-0.16, 0.16]) {
           for (let h = Math.floor(feet); h <= Math.floor(feet + 1.65); h++) {
-            const id = world.getBlock(pos.x + (x-pos.x)*t + ox, h, pos.z + (z-pos.z)*t + oz);
+            const id = world.getBlock(pos.x + (x - pos.x) * t + ox, h, pos.z + (z - pos.z) * t + oz);
             const props = world.getBlockProps(id);
             if (props?.solid || props?.blocksWalk) clear = false;
           }
         }
       }
       if (clear) {
-        stop();
-        flight = { start: pos.clone(), end: new THREE.Vector3(x,y,z), t: 0 };
-        moving = true;
-        const a = ensureActor();
-        a?.lookAt?.(flight.end);
-        a?.setAnim?.('run');
-        ctx.events.emit('sfx', { name: 'boing' });
-        return true;
+        return jumpTo({ x, y, z }, { kind: 'hop' });
       }
-      if (target) break;
     }
     return false;
   }
@@ -399,29 +670,83 @@ export function createPlayer(ctx) {
     return 'step_grass';
   }
 
+  function isTargetWithin(tgt, fallbackRange = INTERACT_RANGE) {
+    if (!tgt?.pos) return false;
+    const range = Number.isFinite(tgt.range) ? tgt.range : fallbackRange;
+    if (tgt.ignoreY) {
+      return Math.hypot(pos.x - tgt.pos.x, pos.z - tgt.pos.z) <= range;
+    }
+    return isInRange(tgt.pos, range);
+  }
+
   function update(dt) {
     const a = ensureActor();
     const sneakNow = isSneaking();
 
     if (flight) {
-      flight.t = Math.min(1, flight.t + dt / 0.62);
-      const { start, end, t } = flight;
+      flight.t = Math.min(1, flight.t + dt / flight.dur);
+      const { start, end, peakY, t } = flight;
       pos.lerpVectors(start, end, t);
-      pos.y = arcY(start.y, end.y, t);
-      a?.group?.position.copy(pos);
+      pos.y = arcY(start.y, end.y, peakY, t);
+      if (a?.group) {
+        a.group.position.copy(pos);
+        if (flight.flipped) {
+          flight.flipT = Math.min(1, flight.flipT + dt / Math.max(0.22, flight.dur * 0.56));
+          a.group.rotation.x = flight.flipT * Math.PI * 2;
+        } else {
+          a.group.rotation.x = 0;
+        }
+      }
       a?.update?.(dt);
       if (t === 1) {
+        const landedFlight = flight;
         flight = null;
         moving = false;
+        if (a?.group) {
+          a.group.position.copy(pos);
+          a.group.rotation.x = 0;
+        }
         setIdleAnim(a, sneakNow);
-        ctx.events.emit('jumpLand', pos);
+        ctx.events.emit('jumpLand', {
+          x: pos.x,
+          y: pos.y,
+          z: pos.z,
+          fromY: landedFlight.fromY,
+          toTree: landedFlight.toTree,
+          kind: landedFlight.kind,
+          flipped: landedFlight.flipped,
+        });
+        if (typeof landedFlight.afterLand === 'function') {
+          landedFlight.afterLand();
+        }
       }
       syncState();
       return;
     }
 
-    // Check queued interaction range even mid-walk (§6: 2.5 blocks)
-    if (queuedTarget && isInRange(queuedTarget.pos, INTERACT_RANGE)) {
+    if (joySpin) {
+      joySpin.t = Math.min(1, joySpin.t + dt / joySpin.dur);
+      pos.y = joySpin.baseY + Math.sin(joySpin.t * Math.PI) * 0.72;
+      if (a?.group) {
+        a.group.position.copy(pos);
+        a.group.rotation.y = joySpin.startYaw + joySpin.t * Math.PI * 2;
+      }
+      if (joySpin.t >= 1) {
+        pos.y = joySpin.baseY;
+        if (a?.group) {
+          a.group.position.copy(pos);
+          a.group.rotation.y = joySpin.startYaw;
+        }
+        joySpin = null;
+        setIdleAnim(a, sneakNow);
+      }
+      a?.update?.(dt);
+      syncState();
+      return;
+    }
+
+    // Check queued interaction range even mid-walk (§6: 2.5 blocks, or custom target.range)
+    if (queuedTarget && isTargetWithin(queuedTarget, INTERACT_RANGE)) {
       const tgt = queuedTarget;
       const cb = queuedCallback;
       path = [];
@@ -477,7 +802,7 @@ export function createPlayer(ctx) {
         }
 
         // Re-check queued interaction right as we cross into range
-        if (queuedTarget && isInRange(queuedTarget.pos, INTERACT_RANGE)) {
+        if (queuedTarget && isTargetWithin(queuedTarget, INTERACT_RANGE)) {
           const tgt = queuedTarget;
           const cb = queuedCallback;
           path = [];
@@ -508,11 +833,20 @@ export function createPlayer(ctx) {
         ctx.events.emit('sfx', { name: stepSoundForArea() });
       }
 
+      // Rustling leafy trail when strolling across tree canopies!
+      if (isOnTree()) {
+        leafStepTimer += dt;
+        if (leafStepTimer >= 0.24) {
+          leafStepTimer = 0;
+          ctx.fx?.burst?.(pos, 0x489c32, 3);
+        }
+      }
+
       if (path.length === 0) {
         moving = false;
         setIdleAnim(a, isSneaking());
         // If we reached the closest walkable cell and have a queued target slightly elevated/fenced (e.g. cage bars <= 3.4)
-        if (queuedTarget && isInRange(queuedTarget.pos, 3.4)) {
+        if (queuedTarget && isTargetWithin(queuedTarget, 3.4)) {
           const tgt = queuedTarget;
           const cb = queuedCallback;
           queuedTarget = null;
@@ -521,6 +855,10 @@ export function createPlayer(ctx) {
           if (typeof cb === 'function') {
             cb(tgt);
           }
+        } else if (!queuedTarget && typeof queuedCallback === 'function') {
+          const cb = queuedCallback;
+          queuedCallback = null;
+          cb();
         } else {
           queuedTarget = null;
           queuedCallback = null;
@@ -548,7 +886,12 @@ export function createPlayer(ctx) {
     ensureActor,
     setPosition,
     jumpForward,
+    jumpTo,
+    triggerMidAirFlip,
+    triggerJoySpin,
     isJumping: () => Boolean(flight),
+    isOnTree,
+    hasNearbyTree,
     walkTo,
     stop,
     isMoving: () => Boolean(moving),

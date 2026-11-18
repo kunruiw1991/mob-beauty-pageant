@@ -222,15 +222,19 @@ export function createCameraRig(ctx) {
     const px = ctx.state?.player?.x ?? 48;
     const py = ctx.state?.player?.y ?? 8;
     const pz = ctx.state?.player?.z ?? 66;
+    // Gently pull camera back when perched high on treetops so nearby canopies & crowns stay in clear view!
+    const treeZoom = py >= 11.5 ? Math.min(2.2, (py - 11.5) * 0.42) : 0;
+    const effDist = dist + treeZoom;
+    const effHeight = height + treeZoom * 0.55;
 
     const fwdX = -Math.sin(yaw);
     const fwdZ = -Math.cos(yaw);
     target.set(px + fwdX * lookAhead, py + targetY, pz + fwdZ * lookAhead);
 
     desiredPos.set(
-      px + Math.sin(yaw) * dist,
-      py + height,
-      pz + Math.cos(yaw) * dist
+      px + Math.sin(yaw) * effDist,
+      py + effHeight,
+      pz + Math.cos(yaw) * effDist
     );
   }
 

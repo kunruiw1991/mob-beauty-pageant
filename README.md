@@ -20,7 +20,8 @@ from the quests and the rival, never from looks.
 | Action | Touch / mouse |
 |---|---|
 | Walk | Tap the ground (or anything — you walk to it) |
-| Jump forward | Tap ↗ Jump or press Space. Tap a nearby gem platform to aim your jump at it. |
+| Jump & climb trees | Tap any tree trunk/leaves, step on a glowing green Slime Bounce Pad, or tap ↗ Jump / Space to vault straight onto treetops! Tap Jump again mid-air to do a 360° flip, and leap from treetop to treetop! |
+| Silly spin | Tap yourself while standing still for a confetti spin |
 | Interact | Tap the glowing thing / the contestant (you walk over first) |
 | Look around | Drag on the world with one finger |
 | Find the next contestant | Follow the light beacon, or tap the edge arrow with her face |
@@ -28,8 +29,8 @@ from the quests and the rival, never from looks.
 | Leaderboard / pause | 🏆 chip top-left · ⏸ top-right |
 | Music / sounds / voice | ⏸ → 🎵 Music · 🔔 Sounds · 🔊 Voice (the voice setting is remembered) |
 
-Find nine gems on the optional Honey Steps, Frost Switchback and Marsh Skips trails. Land on a gem with a jump to collect it. All three gems on a trail trigger a celebration. No text walls: icons, beacons, picture hints and short spoken
-lines (with subtitles) show the way. Progress (board, portraits, stars) is saved in the browser
+Find **9 trail gems** on Honey Steps, Frost Switchback, and Marsh Skips, plus **12 sparkling Treetop Crowns** across Oak, Spruce, and Giant Jungle Tree canopies — chain treetop-to-treetop leaps for ascending musical Sky Hopper combos and Hero Super-Dives back to ground! No text walls: icons, beacons, picture hints and short spoken
+lines (with subtitles) show the way. Progress (board, portraits, stars, trail gems, treetop crowns) is saved in the browser
 (`pageant_progress`). A full run takes about 12–20 minutes.
 
 **Stars:** ★ rank all 10 contestants · ★ find both hidden contestants · ★ finish within 20 minutes.
@@ -90,6 +91,7 @@ See [docs/DESIGN.md](docs/DESIGN.md) for the full design and the fun gates (§12
 
 ## Changelog
 
+- **v1.2 — effortless tree jumping & treetop parkour fun.** Tap any tree (Oak, Spruce, Giant Jungle), step on 4 glowing green Slime Trampoline Bounce Pads, or press Jump (`🌳 Tree!` / `🌿 Leap!` / `🌀 Flip!`) to vault straight onto canopies; stroll across leaves, chain treetop-to-treetop Sky Hopper combos with ascending pentatonic notes, do 360° mid-air somersault flips, Hero Super-Dive off trees seamlessly whenever tapping ground/quests, collect 12 persistent Treetop Crowns, and tap yourself for a joyful confetti spin.
 - **v1.1 — faster walking, English, voice-over.** Walking is 1.5× faster (6.5 blocks/s, 7.8 on long trips) with
   leg cadence matched to speed, smooth turning, rounded corners, a tighter follow camera and judder-free rendering;
   the whole game is in English (new names: Blossom, Bobo, Mimi, Tinny, Snowy, Hissy, Buzzy, Endie, Trio, Emma, Baby

@@ -2480,21 +2480,34 @@ html, body {
   position: fixed;
   left: max(14px, var(--safe-l));
   bottom: max(14px, var(--safe-b));
-  min-width: 84px;
+  min-width: 118px;
   min-height: 70px;
+  padding: 6px 12px;
   display: grid;
   align-content: center;
+  justify-items: center;
   gap: 2px;
-  font-size: 18px;
+  font-size: 17px;
+  white-space: nowrap;
 }
-.hud-jump-btn small { font-size: 13px; }
+.hud-jump-btn strong,
+.hud-jump-btn small {
+  white-space: nowrap;
+  line-height: 1.15;
+}
+.hud-jump-btn small { font-size: 12.5px; opacity: 0.96; }
 .trail-prize {
   position: fixed;
   left: max(14px, var(--safe-l));
   bottom: calc(max(14px, var(--safe-b)) + 78px);
+  max-width: calc(100vw - 28px);
   padding: 8px 12px;
   background: #22283d;
   border: 2px solid #ffd967;
+  border-radius: 6px;
   color: white;
+  font-size: 15px;
   font-weight: 800;
+  pointer-events: none;
+  z-index: 42;
 }

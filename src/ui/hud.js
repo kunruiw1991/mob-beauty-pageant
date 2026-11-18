@@ -116,25 +116,36 @@ export function createHudUI(ctx = {}, hooks = {}) {
   jumpBtn.type = 'button';
   jumpBtn.id = 'hud-jump-btn';
   jumpBtn.className = 'mc-btn mc-btn-green hud-jump-btn';
-  jumpBtn.setAttribute('aria-label', 'Jump forward');
-  jumpBtn.title = 'Jump forward (Space). Tap a nearby gem platform to aim.';
+  jumpBtn.setAttribute('aria-label', 'Jump or hop onto trees');
+  jumpBtn.title = 'Jump (Space). Tap any tree, slime bounce pad, or Jump to hop across treetops — tap again mid-air to flip!';
   jumpBtn.innerHTML = '<strong>↗ Jump</strong><small></small>';
+  const jumpLabel = jumpBtn.querySelector('strong');
   const gemCount = jumpBtn.querySelector('small');
   const prize = document.createElement('output');
   prize.className = 'trail-prize';
   prize.hidden = true;
   let prizeTimer;
-  ctx.events?.on('trailPrize', ({ name, count }) => {
-    prize.textContent = count === 3 ? '🏅 ' + name + ' complete!' : '💎 ' + name + ' ' + count + '/3';
+  ctx.events?.on('trailPrize', ({ kind, name, count, total }) => {
+    if (kind === 'crown') {
+      const maxC = total || 12;
+      prize.textContent =
+        count >= maxC
+          ? `👑 All ${maxC} Tree Crowns!`
+          : `👑 ${name} ${count}/${maxC}`;
+    } else if (kind === 'combo') {
+      prize.textContent = `🌳 ${name} x${count}!`;
+    } else {
+      prize.textContent = count === 3 ? '🏅 ' + name + '!' : '💎 ' + name + ' ' + count + '/3';
+    }
     prize.hidden = false;
     clearTimeout(prizeTimer);
-    prizeTimer = setTimeout(() => { prize.hidden = true; }, 2400);
+    prizeTimer = setTimeout(() => { prize.hidden = true; }, 2600);
   });
   function jump() {
     if (hudRoot.hidden || ctx.state?.scene !== 'world' || ctx.state?.gagCam?.active) return;
     if (!ctx.player?.jumpForward() && !ctx.player?.isJumping()) ctx.events?.emit('sfx', { name: 'blocked' });
   }
-  bindTap(jumpBtn, jump, { ctx, sfx: null });
+  bindTap(jumpBtn, jump, { ctx, sfx: null, debounceMs: 70 });
   window.addEventListener('keydown', ev => {
     if (ev.code !== 'Space' || hudRoot.hidden || ev.target.closest?.('input, textarea, select, button, [contenteditable=true]')) return;
     ev.preventDefault();
@@ -244,7 +255,13 @@ export function createHudUI(ctx = {}, hooks = {}) {
       cx = Math.max(minCx, vw - 156);
     }
 
-    if (cx < 145 && cy > vh - 142) cx = 145;
+    if (cx < 214 && cy > vh - 148) cx = Math.min(maxCx, 214);
+    if (!prize.hidden) {
+      const pr = prize.getBoundingClientRect();
+      if (pr.width > 0 && cx - half < pr.right + 10 && cx + half > pr.left - 10 && cy + half > pr.top - 10 && cy - half < pr.bottom + 10) {
+        cy = Math.max(minCy, pr.top - half - 14);
+      }
+    }
     const angle = Number.isFinite(guide.angle)
       ? guide.angle
       : Math.atan2(cy - vh * 0.5, cx - vw * 0.5);
@@ -310,8 +327,18 @@ export function createHudUI(ctx = {}, hooks = {}) {
     const st = state || ctx.state;
     if (!st) return;
 
-    const total = st.trailGems?.length || 0;
-    gemCount.textContent = '💎 ' + total + '/9';
+    const totalGems = st.trailGems?.length || 0;
+    const totalCrowns = st.treeCrowns?.length || 0;
+    gemCount.textContent = `💎 ${totalGems}/9 👑 ${totalCrowns}/12`;
+    if (ctx.player?.isJumping?.()) {
+      jumpLabel.textContent = '🌀 Flip!';
+    } else if (ctx.player?.isOnTree?.()) {
+      jumpLabel.textContent = ctx.player?.hasNearbyTree?.() ? '🌿 Leap!' : '🪂 Dive!';
+    } else if (ctx.player?.hasNearbyTree?.()) {
+      jumpLabel.textContent = '🌳 Tree!';
+    } else {
+      jumpLabel.textContent = '↗ Jump';
+    }
     const board = st.board || {};
     let mainRanked = 0;
     let hiddenRanked = 0;
@@ -389,8 +416,8 @@ export function createHudUI(ctx = {}, hooks = {}) {
   }
 
   function applyVisibility(visible) {
-    if (visible && hudRoot.hidden && !ctx.state?.trailGems?.length) {
-      prize.textContent = 'Tap a nearby gem platform to jump!';
+    if (visible && hudRoot.hidden && !ctx.state?.trailGems?.length && !ctx.state?.treeCrowns?.length) {
+      prize.textContent = 'Tap a tree to climb!';
       prize.hidden = false;
       clearTimeout(prizeTimer);
       prizeTimer = setTimeout(() => { prize.hidden = true; }, 4500);
@@ -481,6 +508,8 @@ export function createUI(ctx = {}) {
         }
       }
     }
+    if (Array.isArray(saved.trailGems)) ctx.state.trailGems = [...saved.trailGems];
+    if (Array.isArray(saved.treeCrowns)) ctx.state.treeCrowns = [...saved.treeCrowns];
     if (typeof saved.stars === 'number') ctx.state.stars = saved.stars;
     if (typeof saved.elapsedMs === 'number') ctx.state.elapsedMs = saved.elapsedMs;
     boardUI?.restoreWallFromProgress?.();

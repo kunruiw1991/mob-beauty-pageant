@@ -89,6 +89,166 @@ export function createWorld(ctx = {}) {
     return surfaceCache[bx * WZ + bz];
   }
 
+  function isTreeCanopyBlock(id) {
+    return id === B.OAK_LEAVES || id === B.SPRUCE_LEAVES || id === B.JUNGLE_LEAVES;
+  }
+
+  function isTreeLogBlock(id) {
+    return id === B.OAK_LOG || id === B.SPRUCE_LOG || id === B.JUNGLE_LOG;
+  }
+
+  function isTreePartBlock(id) {
+    return isTreeCanopyBlock(id) || isTreeLogBlock(id) || id === B.VINES || id === B.COCOA;
+  }
+
+  function hasLeafNearby(bx, by, bz, r = 2) {
+    for (let dx = -r; dx <= r; dx++) {
+      for (let dz = -r; dz <= r; dz++) {
+        for (let dy = -1; dy <= 2; dy++) {
+          const id = getBlock(bx + dx, by + dy, bz + dz);
+          if (isTreeCanopyBlock(id)) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  function isRealCanopyBlock(bx, by, bz) {
+    let count = 0;
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dz = -1; dz <= 1; dz++) {
+        for (let dy = -1; dy <= 0; dy++) {
+          const id = getBlock(bx + dx, by + dy, bz + dz);
+          if (isTreeCanopyBlock(id) || isTreeLogBlock(id)) {
+            count += 1;
+            if (count >= 2) return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  // Standable treetop check (leaves or high trunk crown surrounded by leaves, with 2 blocks air headroom).
+  // Kept separate from ground isWalkable() so existing ground A* quest routing stays 100% deterministic.
+  function isTreeStandable(x, y, z) {
+    const bx = Math.floor(x);
+    const by = Math.floor(y);
+    const bz = Math.floor(z);
+    if (bx < 0 || bx >= WX || by < 10 || by >= WY - 1 || bz < 0 || bz >= WZ) return false;
+    const colBase = (bx * WZ + bz) * WY;
+    const belowId = voxels[colBase + by - 1];
+    const isLeaf = isTreeCanopyBlock(belowId) && isRealCanopyBlock(bx, by - 1, bz);
+    const isHighLog = isTreeLogBlock(belowId) && by >= 11 && hasLeafNearby(bx, by - 1, bz, 2);
+    if (!isLeaf && !isHighLog) return false;
+
+    const feetId = voxels[colBase + by];
+    if (feetId !== 0) {
+      const fp = BLOCK_PROPS[feetId];
+      if (fp && (fp.solid || fp.blocksWalk)) return false;
+    }
+    const headId = voxels[colBase + by + 1];
+    if (headId !== 0) {
+      const hp = BLOCK_PROPS[headId];
+      if (hp && (hp.solid || hp.blocksWalk)) return false;
+    }
+    return true;
+  }
+
+  function treeTopY(x, z) {
+    const bx = Math.floor(x);
+    const bz = Math.floor(z);
+    if (bx < 0 || bx >= WX || bz < 0 || bz >= WZ) return 0;
+    for (let y = WY - 2; y >= 10; y--) {
+      if (isTreeStandable(bx, y, bz)) return y;
+    }
+    return 0;
+  }
+
+  function findTreePerchNear(bx, by, bz, maxR = 4) {
+    const cx = Math.floor(bx);
+    const cz = Math.floor(bz);
+    // If tapped block itself already has a standable crown right above it, land right there!
+    const exactY = treeTopY(cx, cz);
+    if (exactY >= 10) {
+      return { x: cx + 0.5, y: exactY, z: cz + 0.5, isTreePerch: true };
+    }
+    let best = null;
+    let bestScore = -Infinity;
+    for (let dx = -maxR; dx <= maxR; dx++) {
+      for (let dz = -maxR; dz <= maxR; dz++) {
+        const d = Math.hypot(dx, dz);
+        if (d > maxR + 0.25) continue;
+        const tx = cx + dx;
+        const tz = cz + dz;
+        const ty = treeTopY(tx, tz);
+        if (ty < 10) continue;
+        // Prefer close crown top (slight bonus for higher central crown cells)
+        const score = ty * 0.45 - d * 1.4;
+        if (score > bestScore) {
+          bestScore = score;
+          best = { x: tx + 0.5, y: ty, z: tz + 0.5, isTreePerch: true };
+        }
+      }
+    }
+    return best;
+  }
+
+  function isTreeBlockInRealTree(bx, by, bz) {
+    const id = getBlock(bx, by, bz);
+    if (!isTreePartBlock(id)) return false;
+    return findTreePerchNear(bx, by, bz, 3) !== null;
+  }
+
+  function findTreePerchAhead(px, py, pz, yaw, opts = {}) {
+    const maxDist = opts.maxDist ?? 9.5;
+    const minDist = opts.minDist ?? 0.9;
+    const coneCos = opts.coneCos ?? 0.15;
+    const excludeRadius = opts.excludeRadius ?? 0;
+    const fx = Math.sin(yaw);
+    const fz = Math.cos(yaw);
+    const cx = Math.floor(px);
+    const cz = Math.floor(pz);
+    const rInt = Math.ceil(maxDist);
+
+    let best = null;
+    let bestScore = -Infinity;
+
+    for (let dx = -rInt; dx <= rInt; dx++) {
+      for (let dz = -rInt; dz <= rInt; dz++) {
+        const tx = cx + dx;
+        const tz = cz + dz;
+        const wx = tx + 0.5;
+        const wz = tz + 0.5;
+        const dist = Math.hypot(wx - px, wz - pz);
+        if (dist < minDist || dist > maxDist) continue;
+        if (excludeRadius > 0 && dist < excludeRadius) continue;
+
+        const ty = treeTopY(tx, tz);
+        if (ty < 10) continue;
+
+        const dirX = (wx - px) / Math.max(0.001, dist);
+        const dirZ = (wz - pz) / Math.max(0.001, dist);
+        const dot = dirX * fx + dirZ * fz;
+        // Allow wide forward cone OR immediate nearby tree (within 5.2b in any direction!)
+        if (dot < coneCos && dist > 5.2) continue;
+
+        let score = dot * 4.2 - dist * 0.55 + (ty - 10) * 0.18;
+        if (opts.crownTargets && opts.crownTargets.length > 0) {
+          for (const ct of opts.crownTargets) {
+            const dc = Math.hypot(wx - ct.x, wz - ct.z);
+            if (dc < 2.2) score += 6.0 - dc * 1.5;
+          }
+        }
+        if (score > bestScore) {
+          bestScore = score;
+          best = { x: wx, y: ty, z: wz, isTreePerch: true };
+        }
+      }
+    }
+    return best;
+  }
+
   function isWalkable(x, y, z) {
     if (z === undefined) {
       // Safe 2-arg fallback (x, z)
@@ -596,6 +756,13 @@ export function createWorld(ctx = {}) {
     raycast,
     surfaceY,
     isWalkable,
+    isTreeCanopyBlock,
+    isTreePartBlock,
+    isTreeStandable,
+    treeTopY,
+    findTreePerchNear,
+    isTreeBlockInRealTree,
+    findTreePerchAhead,
     findPath: nav.findPath,
     nearestWalkable: nav.nearestWalkable,
     setArea,

@@ -1,5 +1,12 @@
 // Main integrator & pageant game flow per docs/DESIGN.md §1–§11 (owner: core).
-import { padAt, createTrailGems, trails } from './world/jump-trails.js';
+import {
+  padAt,
+  createTrailGems,
+  trails,
+  TREE_CROWNS,
+  treeCrownAt,
+  bouncePadAt,
+} from './world/jump-trails.js';
 import * as THREE from '../vendor/three.module.min.js';
 import * as ROSTER_MODULE from './data/roster.js';
 import { ROSTER, ROSTER_BY_ID, TIERS } from './data/roster.js';
@@ -278,17 +285,84 @@ async function boot() {
   // Picker, Player, Areas, Rival, Quests
   ctx.pick = createPicker(ctx);
   ctx.player = createPlayer(ctx);
-  const updateGems = createTrailGems(ctx.scene);
+  const updateGems = createTrailGems(ctx.scene, ctx.world);
   updateGems(state, 0);
+  let bouncePadCooldown = 0;
+
   events.on('jumpLand', (pos) => {
     const hit = padAt(pos.x, pos.z);
-    if (!hit || pos.y !== hit.pad[2] || state.trailGems.includes(hit.key)) return;
-    state.trailGems.push(hit.key);
-    const count = hit.trail.pads.filter((_, i) => state.trailGems.includes(hit.trail.name + i)).length;
-    events.emit('trailPrize', { name: hit.trail.name, count });
-    events.emit('sfx', { name: count === 3 ? 'fanfare' : 'pickup' });
-    if (count === 3) ctx.fx?.confetti?.('screen', 64);
-    saveStateProgress();
+    if (hit && Math.abs(pos.y - hit.pad[2]) <= 0.35 && !state.trailGems.includes(hit.key)) {
+      state.trailGems.push(hit.key);
+      const count = hit.trail.pads.filter((_, i) => state.trailGems.includes(hit.trail.name + i)).length;
+      events.emit('trailPrize', { kind: 'gem', name: hit.trail.name, count, total: 3 });
+      events.emit('sfx', { name: count === 3 ? 'fanfare' : 'pickup' });
+      if (count === 3) ctx.fx?.confetti?.('screen', 64);
+      saveStateProgress();
+    }
+
+    const landedOnTree = Boolean(
+      pos.toTree ||
+      (pos.y >= 10 && ctx.world?.isTreeStandable?.(pos.x, Math.round(pos.y), pos.z))
+    );
+
+    if (landedOnTree) {
+      state.treeJumps = (state.treeJumps || 0) + 1;
+      state.treeCombo = (state.treeCombo || 0) + 1;
+      ctx.fx?.burst?.(pos, 0x489c32, 16);
+      ctx.fx?.ring?.(pos, 0x70e000, { s0: 0.35, s1: 1.5, life: 0.38 });
+      const noteIdx = Math.min(5, Math.max(0, state.treeCombo - 1));
+      events.emit('sfx', { name: `note${noteIdx}` });
+
+      const crown = treeCrownAt(pos.x, pos.z, pos.y);
+      if (crown && !state.treeCrowns.includes(crown.id)) {
+        state.treeCrowns.push(crown.id);
+        const owned = state.treeCrowns.length;
+        const totalCrowns = TREE_CROWNS.length;
+        const isAllCrowns = owned === totalCrowns;
+        events.emit('trailPrize', {
+          kind: 'crown',
+          name: crown.name,
+          count: owned,
+          total: totalCrowns,
+        });
+        events.emit('sfx', { name: isAllCrowns || owned % 4 === 0 ? 'fanfare' : 'pickup' });
+        events.emit('sfx', { name: 'cheer', vol: 0.55 });
+        ctx.fx?.sparkles?.(pos, 20, { toPlayer: true });
+        ctx.fx?.confetti?.(isAllCrowns ? 'screen' : pos, isAllCrowns ? 140 : 34);
+        ctx.fx?.popup?.(pos, '👑');
+        if (isAllCrowns) {
+          ctx.fx?.fireworks?.({ x: pos.x, y: pos.y + 4, z: pos.z }, 3);
+        }
+        ctx.crowdCtrl?.react?.('cheer');
+        saveStateProgress();
+      } else if (state.treeCombo >= 3) {
+        ctx.fx?.sparkles?.(pos, 14);
+        ctx.fx?.popup?.(pos, '🥳');
+        ctx.crowdCtrl?.react?.('cheer');
+        events.emit('trailPrize', { kind: 'combo', name: 'Sky Hopper', count: state.treeCombo });
+      } else if (state.treeCombo === 2) {
+        ctx.fx?.sparkles?.(pos, 10);
+        ctx.fx?.popup?.(pos, '⭐');
+      } else {
+        ctx.fx?.popup?.(pos, pos.flipped ? '🌀' : '✨');
+      }
+      ctx.ui?.updateHUD?.(snapshotState(state));
+      return;
+    }
+
+    // Ground or pad landing: reset tree combo and celebrate Hero Super-Dives from high canopies!
+    state.treeCombo = 0;
+    const dropHeight = (pos.fromY ?? pos.y) - pos.y;
+    if (dropHeight >= 3.5) {
+      ctx.fx?.ring?.(pos, 0xffd43b, { s0: 0.4, s1: 2.2, life: 0.44 });
+      ctx.fx?.burst?.(pos, 0x489c32, 14);
+      ctx.fx?.sparkles?.(pos, 16);
+      ctx.fx?.popup?.(pos, pos.flipped ? '🌀' : '🎉');
+      ctx.cam?.shake?.(0.22, 0.2);
+      events.emit('sfx', { name: 'splash' });
+      ctx.crowdCtrl?.react?.('cheer');
+    }
+    ctx.ui?.updateHUD?.(snapshotState(state));
   });
   ctx.areas = createAreas(ctx);
   ctx.rival = createRival(ctx);
@@ -860,6 +934,9 @@ async function boot() {
     }
 
     if (ctx.player.isJumping()) {
+      if (!hit?.fromAgent) {
+        ctx.player.triggerMidAirFlip?.();
+      }
       events.emit('feedback', { kind: 'interact', pos: safePos });
       return true;
     }
@@ -902,6 +979,97 @@ async function boot() {
       if (dest) {
         if (feedbackCounter === fbBefore) {
           events.emit('feedback', { kind: 'walk', pos: dest });
+        }
+        return true;
+      }
+    }
+
+    // 2b. Tap ANY tree trunk or canopy in Hub -> effortless vault straight up onto the treetop!
+    if (hit?.type === 'block' && state.area === 'hub') {
+      const bx = Math.floor(safePos.x);
+      const by = Math.floor(safePos.y);
+      const bz = Math.floor(safePos.z);
+
+      if (ctx.world?.isTreeBlockInRealTree?.(bx, by, bz)) {
+        const perch = ctx.world.findTreePerchNear?.(bx, by, bz, 4);
+        if (perch) {
+          const dist = Math.hypot(perch.x - ctx.player.pos.x, perch.z - ctx.player.pos.z);
+          const onTreeNow = Boolean(ctx.player.isOnTree?.());
+          const samePerch = onTreeNow && dist < 1.2 && Math.abs(perch.y - ctx.player.pos.y) <= 0.6;
+          if (samePerch) {
+            ctx.player.triggerJoySpin?.();
+            if (feedbackCounter === fbBefore) {
+              events.emit('feedback', { kind: 'interact', pos: perch });
+            }
+            return true;
+          }
+          const vaultRange = onTreeNow ? 14.5 : 12.5;
+          if (dist <= vaultRange && ctx.player.jumpTo?.(perch, {
+            isTreePerch: true,
+            kind: onTreeNow ? 'tree_hop' : 'tree_vault',
+          })) {
+            if (feedbackCounter === fbBefore) {
+              events.emit('feedback', { kind: 'walk', pos: perch });
+            }
+            return true;
+          }
+          const walkDest = ctx.player.walkTo(
+            { x: perch.x, y: 8, z: perch.z },
+            {
+              maxSearchR: 6,
+              allowClamp: true,
+              target: { pos: { x: perch.x, y: 8, z: perch.z }, range: 8.5, ignoreY: true },
+              onArrive: () => {
+                ctx.player.jumpTo?.(perch, { isTreePerch: true, kind: 'tree_vault' });
+              },
+            }
+          );
+          if (walkDest) {
+            if (feedbackCounter === fbBefore) {
+              events.emit('feedback', { kind: 'walk', pos: perch });
+            }
+            return true;
+          }
+        }
+      }
+
+      // 2c. Tap a glowing Slime Bounce Pad -> sky-launch onto its tree!
+      const tappedBounce = bouncePadAt(safePos.x, safePos.z, by + 1);
+      if (tappedBounce) {
+        const perch = ctx.world?.findTreePerchNear?.(tappedBounce.targetX, 12, tappedBounce.targetZ, 4);
+        const dPad = Math.hypot(tappedBounce.x - ctx.player.pos.x, tappedBounce.z - ctx.player.pos.z);
+        if (perch && dPad <= 2.8 && ctx.player.jumpTo?.(perch, {
+          isTreePerch: true,
+          superBounce: true,
+          kind: 'slime_bounce',
+        })) {
+          bouncePadCooldown = 1.2;
+          ctx.fx?.popup?.(ctx.player.pos, '💚');
+          if (feedbackCounter === fbBefore) {
+            events.emit('feedback', { kind: 'walk', pos: perch });
+          }
+          return true;
+        }
+        const walkPad = ctx.player.walkTo({ x: tappedBounce.x, y: 8, z: tappedBounce.z }, { maxSearchR: 4, allowClamp: true });
+        if (walkPad) {
+          if (feedbackCounter === fbBefore) {
+            events.emit('feedback', { kind: 'walk', pos: walkPad });
+          }
+          return true;
+        }
+      }
+
+      // 2d. Self-tap while standing still -> joyful 360° confetti spin!
+      if (
+        !hit?.fromAgent &&
+        !hit?.fromBeaconArrow &&
+        !ctx.player.isMoving() &&
+        Math.hypot(bx + 0.5 - ctx.player.pos.x, bz + 0.5 - ctx.player.pos.z) < 0.85 &&
+        Math.abs((by + 1) - ctx.player.pos.y) <= 0.65 &&
+        ctx.player.triggerJoySpin?.()
+      ) {
+        if (feedbackCounter === fbBefore) {
+          events.emit('feedback', { kind: 'interact', pos: ctx.player.pos });
         }
         return true;
       }
@@ -1162,6 +1330,8 @@ async function boot() {
     }
     const keys = trails.flatMap(trail => trail.pads.map((_, i) => trail.name + i));
     state.trailGems = keys.filter(key => Array.isArray(saved.trailGems) && saved.trailGems.includes(key));
+    const crownIds = TREE_CROWNS.map((c) => c.id);
+    state.treeCrowns = crownIds.filter((id) => Array.isArray(saved.treeCrowns) && saved.treeCrowns.includes(id));
     if (saved.elapsedMs !== undefined) {
       state.elapsedMs = Math.max(0, Number(saved.elapsedMs) || 0);
       state._runFrames = Math.round((state.elapsedMs / 1000) * 60);
@@ -1774,6 +1944,27 @@ async function boot() {
           }
         } else {
           ctx.player.update(dt);
+          if (bouncePadCooldown > 0) {
+            bouncePadCooldown = Math.max(0, bouncePadCooldown - dt);
+          } else if (
+            state.area === 'hub' &&
+            !ctx.player.isJumping() &&
+            !ctx.player.isSneaking() &&
+            state.quest?.id !== 'cat'
+          ) {
+            const bPad = bouncePadAt(ctx.player.pos.x, ctx.player.pos.z, ctx.player.pos.y);
+            if (bPad) {
+              const perch = ctx.world?.findTreePerchNear?.(bPad.targetX, 12, bPad.targetZ, 4);
+              if (perch && ctx.player.jumpTo?.(perch, {
+                isTreePerch: true,
+                superBounce: true,
+                kind: 'slime_bounce',
+              })) {
+                bouncePadCooldown = 1.2;
+                ctx.fx?.popup?.(ctx.player.pos, '💚');
+              }
+            }
+          }
           ctx.quests?.update?.(dt);
         }
       } else if (state.scene === 'booth' || state.scene === 'board' || state.scene === 'finale') {
